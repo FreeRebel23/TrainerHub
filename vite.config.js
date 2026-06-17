@@ -2,13 +2,21 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
+// Build-Zeitpunkt als Versionsmarker (in der App unter Einstellungen sichtbar)
+const buildTime = new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC";
+
 export default defineConfig({
   // Relative Pfade, damit die App auch in Unterordnern bzw. ohne Server-Root läuft
   base: "./",
+  define: {
+    __BUILD_TIME__: JSON.stringify(buildTime),
+  },
   plugins: [
     react(),
     VitePWA({
-      registerType: "autoUpdate",
+      // "prompt": neue Version wird gemeldet statt still erzwungen — ermöglicht
+      // den manuellen Update-Button + Hinweis-Banner in der App.
+      registerType: "prompt",
       includeAssets: ["favicon.svg", "apple-touch-icon.png"],
       manifest: {
         name: "TrainerHub TV Bretten",

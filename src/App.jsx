@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import Papa from "papaparse";
+import { usePwaUpdate } from "./usePwaUpdate.js";
 
 // ─────────────────────────────────────────────
 // CONSTANTS
@@ -2351,7 +2352,7 @@ function importTrainingPlan(file, data, update, teamId, onDone) {
 // SETTINGS VIEW
 // ─────────────────────────────────────────────
 
-function SettingsView({ data, update }) {
+function SettingsView({ data, update, pwa }) {
   const [editingId, setEditingId]       = useState(null);
   const [draft, setDraft]               = useState({});
   const [showAdd, setShowAdd]           = useState(false);
@@ -2753,6 +2754,43 @@ function SettingsView({ data, update }) {
               💡 Einmal installiert läuft TrainerHub offline — auch ohne WLAN in der Halle.
             </p>
           </div>
+        </div>
+
+        {/* ── APP-VERSION & UPDATE ── */}
+        <p style={{ ...ss.label, marginTop: 20, marginBottom: 10 }}>App-Version</p>
+        <div style={{ background: C.card, border: "1px solid " + C.border, borderRadius: 16, padding: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <span style={{ color: C.textSoft, fontSize: 13 }}>Stand</span>
+            <span style={{ color: C.text, fontSize: 13, fontWeight: 700 }}>{__BUILD_TIME__}</span>
+          </div>
+
+          {pwa?.needRefresh ? (
+            <button onClick={pwa.applyUpdate} style={{
+              width: "100%", background: C.orange, color: "#1a0a00", border: "none",
+              borderRadius: 12, padding: "12px", fontWeight: 800, fontSize: 14, cursor: "pointer",
+            }}>
+              ⬇️ Neue Version installieren
+            </button>
+          ) : (
+            <button onClick={pwa?.checkForUpdate} disabled={pwa?.checking} style={{
+              width: "100%", background: "transparent", color: C.orange,
+              border: "1px solid " + C.orangeDk, borderRadius: 12, padding: "12px",
+              fontWeight: 700, fontSize: 14, cursor: pwa?.checking ? "default" : "pointer",
+              opacity: pwa?.checking ? 0.6 : 1,
+            }}>
+              {pwa?.checking ? "Suche nach Updates …" : "🔄 Auf Updates prüfen"}
+            </button>
+          )}
+
+          {pwa?.upToDate && !pwa?.needRefresh && (
+            <p style={{ margin: "10px 0 0", color: C.muted, fontSize: 12, textAlign: "center" }}>
+              ✅ Du nutzt bereits die neueste Version.
+            </p>
+          )}
+          <p style={{ margin: "10px 0 0", color: C.muted, fontSize: 12, lineHeight: 1.6 }}>
+            Ein Update tauscht nur den App-Code aus — deine Teams, Spieler:innen und
+            erfassten Trainings bleiben dabei erhalten.
+          </p>
         </div>
 
         <p style={{ color: C.muted, fontSize: 11, textAlign: "center", marginTop: 20 }}>
@@ -3232,6 +3270,7 @@ function JahrgangUpgradeView({ data, update, seasonId, go, back }) {
 export default function App() {
   const { data, update } = useData();
   const [nav, setNav]    = useState({ view: "home", params: {} });
+  const pwa              = usePwaUpdate();
 
   function go(view, params = {}) { setNav({ view, params }); }
 
@@ -3266,6 +3305,23 @@ export default function App() {
   return (
     <div style={{ fontFamily: "-apple-system, \'Helvetica Neue\', BlinkMacSystemFont, sans-serif",
       background: C.bg }}>
+      {pwa.needRefresh && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000,
+          background: C.orange, color: "#1a0a00", padding: "calc(env(safe-area-inset-top) + 10px) 16px 10px",
+          display: "flex", alignItems: "center", gap: 12, boxShadow: "0 2px 12px #0008",
+        }}>
+          <span style={{ fontSize: 13, fontWeight: 700, flex: 1 }}>
+            Neue Version verfügbar — deine Daten bleiben erhalten.
+          </span>
+          <button onClick={pwa.applyUpdate} style={{
+            background: "#1a0a00", color: C.orange, border: "none", borderRadius: 10,
+            padding: "8px 14px", fontWeight: 800, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap",
+          }}>
+            Jetzt aktualisieren
+          </button>
+        </div>
+      )}
       {v === "home"           && <HomeView data={data} go={go} />}
       {v === "new_session"    && <NewSessionView data={data} onSave={saveSession}
                                    back={() => go("home")} plan={nav.params?.plan} />}
@@ -3286,7 +3342,7 @@ export default function App() {
       {v === "jahrgang_upgrade" && <JahrgangUpgradeView data={data} update={update}
                                    seasonId={nav.params.seasonId} go={go} back={() => go("season_detail", { seasonId: nav.params.seasonId, teamId: nav.params.teamId })} />}
       {v === "stats"          && <StatsView data={data} />}
-      {v === "settings"       && <SettingsView data={data} update={update} />}
+      {v === "settings"       && <SettingsView data={data} update={update} pwa={pwa} />}
       {showTabs && <BottomNav active={v} go={go} />}
     </div>
   );
