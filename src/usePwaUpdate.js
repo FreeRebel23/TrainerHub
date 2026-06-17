@@ -10,7 +10,7 @@ export function usePwaUpdate() {
   const [upToDate, setUpToDate] = useState(false);
 
   const {
-    needRefresh: [needRefresh],
+    needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(_swUrl, r) { regRef.current = r ?? null; },
@@ -34,11 +34,23 @@ export function usePwaUpdate() {
     }, 2500);
   }
 
+  function applyUpdate() {
+    // Banner sofort ausblenden (optimistisch) — sonst bleibt es stehen, wenn der
+    // automatische Reload ausbleibt.
+    setNeedRefresh(false);
+    // Fallback unabhängig planen: manche Umgebungen (v.a. iOS-Standalone-PWA)
+    // führen den automatischen Reload von updateServiceWorker(true) nicht aus.
+    // Greift der automatische Reload doch, ist die Seite längst weg und der
+    // Timer irrelevant.
+    setTimeout(() => window.location.reload(), 1500);
+    updateServiceWorker(true).catch(() => {});
+  }
+
   return {
     needRefresh,                              // true → neue Version liegt bereit
     checking,                                 // läuft gerade eine Prüfung?
     upToDate,                                 // letzte Prüfung ergab: aktuell
     checkForUpdate,                           // manuelle Prüfung anstoßen
-    applyUpdate: () => updateServiceWorker(true), // aktivieren + App neu laden
+    applyUpdate,                              // aktivieren + App neu laden
   };
 }
