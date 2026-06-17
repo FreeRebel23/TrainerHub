@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#09090f"/>
+  <g transform="translate(256 256) scale(1) translate(-256 -256)">
+    <circle cx="256" cy="256" r="186" fill="none" stroke="#f97316" stroke-width="20"/>
+    <text x="256" y="256" font-family="Helvetica, Arial, sans-serif" font-size="200"
+          font-weight="700" fill="#f97316" text-anchor="middle"
+          dominant-baseline="central">TH</text>
+  </g>
+</svg>
