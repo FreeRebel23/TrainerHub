@@ -1023,7 +1023,7 @@ function printStats(teamName, allSess, ranking, selSeason) {
     <div><div class="tl">Ges. Min.</div><div class="tv">${allSess.reduce((s,x)=>s+x.durationMinutes,0)}</div></div>
     <div><div class="tl">Spieler:innen</div><div class="tv">${ranking.length}</div></div>
   </div>
-  <table><thead><tr><th style="text-align:center">#</th><th>Spielerin</th>
+  <table><thead><tr><th style="text-align:center">#</th><th>Spieler:in</th>
   <th style="text-align:center">Einheiten</th><th style="text-align:center">Quote</th>
   <th style="text-align:right">Punkte</th></tr></thead>
   <tbody>${rows}</tbody></table>
@@ -1852,7 +1852,7 @@ function TeamDetailView({ data, update, teamId, back, go }) {
         {showNew ? (
           <div style={{ background: C.card, border: "1px solid " + C.orange + "40",
             borderRadius: 16, padding: 16 }}>
-            <p style={{ ...ss.label, color: C.orange, marginBottom: 10 }}>Neue Spielerin anlegen</p>
+            <p style={{ ...ss.label, color: C.orange, marginBottom: 10 }}>Neue:n Spieler:in anlegen</p>
             <input value={newName} onChange={e => setNewName(e.target.value)} autoFocus
               placeholder="Vollständiger Name" style={{ ...ss.input, marginBottom: 8 }} />
             <input value={newYear} onChange={e => setNewYear(e.target.value)}
@@ -1868,7 +1868,7 @@ function TeamDetailView({ data, update, teamId, back, go }) {
         ) : (
           <button onClick={() => { setShowNew(true); setShowPick(false); }} style={optBtn(false)}>
             <Plus size={18} color={C.orange} />
-            <span style={{ color: C.orange }}>Neue Spielerin anlegen</span>
+            <span style={{ color: C.orange }}>Neue:n Spieler:in anlegen</span>
           </button>
         )}
 
@@ -1876,11 +1876,11 @@ function TeamDetailView({ data, update, teamId, back, go }) {
         {showPick ? (
           <div style={{ background: C.card, border: "1px solid " + C.border, borderRadius: 16, padding: 16 }}>
             <p style={{ ...ss.label, color: "#60a5fa", marginBottom: 10 }}>
-              Bestehende Spielerin hinzufügen ({available.length} verfügbar)
+              Bestehende:n Spieler:in hinzufügen ({available.length} verfügbar)
             </p>
             {available.length === 0 ? (
               <p style={{ color: C.muted, fontSize: 13 }}>
-                Alle Spielerinnen aus dem globalen Register sind bereits in diesem Team.
+                Alle Spieler:innen aus dem globalen Register sind bereits in diesem Team.
               </p>
             ) : (
               <>
@@ -1928,7 +1928,7 @@ function TeamDetailView({ data, update, teamId, back, go }) {
         ) : (
           <button onClick={() => { setShowPick(true); setShowNew(false); }} style={optBtn(false)}>
             <Users size={18} color="#60a5fa" />
-            <span style={{ color: "#60a5fa" }}>Bestehende Spielerin hinzufügen</span>
+            <span style={{ color: "#60a5fa" }}>Bestehende:n Spieler:in hinzufügen</span>
           </button>
         )}
       </div>
@@ -2229,7 +2229,7 @@ function exportAttendanceXLSX(data, teamId, sfilt) {
   const getType = id => (data.trainingTypes ?? []).find(t => t.id === id);
 
   // Header row
-  const hdr = ["Spielerin", "Jg.", ...sessions.map(s =>
+  const hdr = ["Spieler:in", "Jg.", ...sessions.map(s =>
     fmtDate(s.date) + " " + (getType(s.trainingTypeId)?.name ?? "")
   ), "Anwes.", "Quote", "Punkte"];
 
@@ -2259,7 +2259,7 @@ function exportAttendanceXLSX(data, teamId, sfilt) {
 }
 
 function exportRankingXLSX(teamName, allSess, ranking, seasonName) {
-  const hdr = ["#","Spielerin","Jg.","Einheiten","Quote %","Punkte","Commitment"];
+  const hdr = ["#","Spieler:in","Jg.","Einheiten","Quote %","Punkte","Commitment"];
   const rows = ranking.map((r, i) => [
     i + 1, r.player.name, r.player.birthYear ?? "",
     r.cnt, r.pct, r.pts, r.commits,
@@ -2546,10 +2546,10 @@ function SettingsView({ data, update, pwa }) {
         </div>
 
         {/* ── SYNCHRONISATION ── */}
-        <p style={{ ...ss.label, marginTop: 24, marginBottom: 10 }}>Synchronisation mit Rüdiger</p>
+        <p style={{ ...ss.label, marginTop: 24, marginBottom: 10 }}>Synchronisation mit anderen Trainer:innen</p>
         <div style={{ background: "#0c1a2e", border: "1px solid #1e3a5f", borderRadius: 16, padding: 14, marginBottom: 10 }}>
           <p style={{ margin: "0 0 4px", color: "#93c5fd", fontSize: 13, lineHeight: 1.6 }}>
-            Jeder Trainer arbeitet mit seiner eigenen App. Zum Abgleich:
+            Jede:r Trainer:in arbeitet mit der eigenen App. Zum Abgleich:
             <br/>① <strong>Sync senden</strong> → JSON per WhatsApp teilen
             <br/>② Empfänger tippt <strong>Sync empfangen</strong> → fertig
           </p>
@@ -2575,7 +2575,7 @@ function SettingsView({ data, update, pwa }) {
             <span style={{ fontSize: 20 }}>📥</span>
             <div style={{ flex: 1 }}>
               <p style={{ margin: 0, fontWeight: 700, color: C.textSoft }}>Sync empfangen</p>
-              <p style={{ margin: 0, fontSize: 12, color: C.muted }}>Sync-Datei von Rüdiger importieren</p>
+              <p style={{ margin: 0, fontSize: 12, color: C.muted }}>Empfangene Sync-Datei importieren</p>
             </div>
             <input type="file" accept=".json" style={{ display: "none" }} onChange={e => {
               const f = e.target.files?.[0];
@@ -3115,7 +3115,7 @@ function SeasonDetailView({ data, update, seasonId, go, back }) {
                   Jahrgangs-Upgrade starten
                 </p>
                 <p style={{ margin: 0, color: C.muted, fontSize: 12 }}>
-                  Spielerinnen in anderes Team übertragen · Saison abschließen
+                  Spieler:innen in anderes Team übertragen · Saison abschließen
                 </p>
               </div>
               <ChevronRight size={18} color="#60a5fa" />
@@ -3190,7 +3190,7 @@ function JahrgangUpgradeView({ data, update, seasonId, go, back }) {
         <div style={{ background: "#0c1a2e", border: "1px solid #1e3a5f",
           borderRadius: 14, padding: 14, marginBottom: 20 }}>
           <p style={{ margin: 0, color: "#93c5fd", fontSize: 13, lineHeight: 1.6 }}>
-            Spielerinnen aus <strong>{srcTeam.name}</strong> auswählen und in ein anderes Team übertragen.
+            Spieler:innen aus <strong>{srcTeam.name}</strong> auswählen und in ein anderes Team übertragen.
             Sie bleiben im Quellteam erhalten — dort anschließend manuell entfernen.
           </p>
         </div>
@@ -3217,7 +3217,7 @@ function JahrgangUpgradeView({ data, update, seasonId, go, back }) {
           </div>
         )}
 
-        <p style={ss.label}>Spielerinnen auswählen ({cnt} ausgewählt)</p>
+        <p style={ss.label}>Spieler:innen auswählen ({cnt} ausgewählt)</p>
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
           {srcPlayers.map(p => {
             const on = !!sel[p.id];
