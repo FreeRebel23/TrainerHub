@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Users, FileText, Sun, CheckCheck, RotateCcw, Pencil, Tags, History } from "lucide-react";
 import { todayISO, fmtDateFull, getSchoolHoliday, getHoliday } from "../lib/dates.js";
 import { byId, calcFactor, getTeamPlayers, isPresent, uid } from "../lib/data.js";
@@ -50,11 +50,18 @@ export function NewSessionView({ data, onSave, back, go, params }) {
   const players = getTeamPlayers(form.teamId, data);
   const playerMap = Object.fromEntries(players.map(p => [p.id, p]));
 
-  // Entwurf sichern, sobald die Anwesenheit läuft
-  useEffect(() => { if (att) saveDraft(key, { form, att }); }, [key, form, att]);
+  // Entwurf sichern, sobald tatsächlich etwas erfasst wurde (bloßes Öffnen legt keinen an)
+  const pristine = useRef(null);
+  useEffect(() => {
+    if (!att) return;
+    const snapshot = JSON.stringify({ form, att });
+    if (pristine.current === null) pristine.current = restored ? "" : snapshot;
+    if (snapshot !== pristine.current) saveDraft(key, { form, att });
+  }, [key, form, att, restored]);
 
   function discardDraft() {
     clearDraft();
+    pristine.current = null;
     setForm(initialForm(data, params, plan));
     setAtt(step === 2 ? defaultAtt(getTeamPlayers(plan?.teamId ?? form.teamId, data)) : null);
     setShowRestored(false);

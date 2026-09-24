@@ -16,7 +16,7 @@ export function PlanDetailView({ data, update, planId, go, back }) {
   if (!plan) {
     return (
       <div className="page">
-        <PageHeader title="Geplantes Training" back={back} />
+        <PageHeader title="Planung" back={back} />
         <div className="page-body"><EmptyState icon={SearchX} title="Planung nicht gefunden" text="Sie wurde vermutlich gelöscht." /></div>
       </div>
     );
@@ -48,7 +48,7 @@ export function PlanDetailView({ data, update, planId, go, back }) {
 
   return (
     <div className="page">
-      <PageHeader title="Geplantes Training" back={back} actions={<>
+      <PageHeader title="Planung" back={back} actions={<>
         <IconButton icon={Copy} label="Duplizieren" onClick={() => go("plan_edit", { from: { kind: "plan", id: plan.id } })} />
         <IconButton icon={Printer} label="Drucken" onClick={() => printPlan(plan, data)} />
         <IconButton icon={Trash2} label="Planung löschen" variant="danger" onClick={remove} />

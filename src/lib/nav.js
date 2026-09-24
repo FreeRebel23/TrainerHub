@@ -31,6 +31,7 @@ export function useNav() {
   navRef.current = nav;
   const pending = useRef(null);
   const restoreScroll = useRef(null);
+  const popped = useRef(0);   // zählt popstate-Ereignisse (für den Rückfall ohne Verlauf)
 
   useEffect(() => {
     // Scrollposition selbst verwalten: der Browser stellt sie sonst her, bevor React
@@ -38,6 +39,7 @@ export function useNav() {
     if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual";
     if (!current()) window.history.replaceState(HOME, "");
     const onPop = e => {
+      popped.current++;
       const s = e.state && e.state.view ? e.state : HOME;
       if (pending.current) {
         // finishFlow: nach dem Zurückspringen das Ziel als neue Ebene anlegen
@@ -82,11 +84,20 @@ export function useNav() {
     setNav(next);
   }, []);
 
+  // Browser-Verlauf zurückspringen. Fehlt der Verlauf trotz depth > 0 (z. B. nach dem
+  // Wiederherstellen einer verworfenen Seite), kommt kein popstate – dann Rückfall.
+  const historyGo = useCallback((n, fallback) => {
+    const before = popped.current;
+    window.history.go(-n);
+    setTimeout(() => { if (popped.current === before) fallback(); }, 350);
+  }, []);
+
   // Zurück: echter History-Schritt, wenn es einen gibt, sonst zur Eltern-Ansicht
   const back = useCallback((fallbackView = "home", fallbackParams = {}) => {
-    if (navRef.current.depth > 0) window.history.back();
-    else { restoreScroll.current = 0; go(fallbackView, fallbackParams, { replace: true }); }
-  }, [go]);
+    const toParent = () => { restoreScroll.current = 0; go(fallbackView, fallbackParams, { replace: true }); };
+    if (navRef.current.depth > 0) historyGo(1, toParent);
+    else toParent();
+  }, [go, historyGo]);
 
   // Mehrstufigen Ablauf (z. B. Erfassen-Assistent) abschließen: die `steps` Einträge des
   // Ablaufs verlassen und das Ergebnis öffnen. Zurück führt danach dorthin, wo der Ablauf begann.
@@ -94,8 +105,12 @@ export function useNav() {
     const n = flowSteps(steps, navRef.current.depth);
     if (n === 0) { restoreScroll.current = 0; go(view, params, { replace: true }); return; }
     pending.current = { view, params };
-    window.history.go(-n);
-  }, [go]);
+    historyGo(n, () => {
+      pending.current = null;
+      restoreScroll.current = 0;
+      go(view, params, { replace: true });
+    });
+  }, [go, historyGo]);
 
   return { nav, go, back, finishFlow };
 }
