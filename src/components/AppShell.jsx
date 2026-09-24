@@ -13,6 +13,7 @@ export const TABS = [
 const VIEW_TAB = {
   home: "home",
   training: "training", calendar_day: "training", session_detail: "training", new_session: "training",
+  plan_edit: "training", plan_detail: "training",
   teams: "teams", team_detail: "teams", season_list: "teams", new_season: "teams",
   season_detail: "teams", jahrgang_upgrade: "teams",
   stats: "stats",

@@ -14,9 +14,11 @@ import { TeamsView, TeamDetailView } from "./views/Teams.jsx";
 import { SeasonListView, NewSeasonView, SeasonDetailView, JahrgangUpgradeView } from "./views/Seasons.jsx";
 import { StatsView } from "./views/Stats.jsx";
 import { SettingsView } from "./views/Settings.jsx";
+import { PlanEditView } from "./views/PlanEdit.jsx";
+import { PlanDetailView } from "./views/PlanDetail.jsx";
 
 // Fokus-Ansichten blenden die mobile Tab-Leiste aus (Daumenbereich gehört der Aktion)
-const FOCUS_VIEWS = new Set(["new_session", "new_season", "jahrgang_upgrade"]);
+const FOCUS_VIEWS = new Set(["new_session", "plan_edit", "new_season", "jahrgang_upgrade"]);
 const KEEP_STATE  = new Set(["new_session", "training"]);
 
 export default function App() {
@@ -40,7 +42,7 @@ export default function App() {
       return next;
     });
     // Assistent aus dem Verlauf nehmen: Zurück führt danach dorthin, wo das Erfassen begann
-    finishFlow(p.step === 2 ? 2 : 1, "session_detail", { sessionId: sess.id });
+    finishFlow(p.steps ?? 1, "session_detail", { sessionId: sess.id });
   }
 
   function deleteSession(id) {
@@ -62,6 +64,8 @@ export default function App() {
     case "new_session":    page = <NewSessionView {...common} params={p} onSave={saveSession} back={() => back("training")} />; break;
     case "session_detail": page = <SessionDetailView {...common} sessionId={p.sessionId} editing={!!p.edit}
                              back={() => back(p.edit ? "session_detail" : "training", p.edit ? { sessionId: p.sessionId } : {})} onDelete={deleteSession} />; break;
+    case "plan_edit":      page = <PlanEditView {...common} params={p} finishFlow={finishFlow} back={() => back(p.planId ? "plan_detail" : "training", p.planId ? { planId: p.planId } : {})} />; break;
+    case "plan_detail":    page = <PlanDetailView {...common} planId={p.planId} back={() => back("training")} />; break;
     case "teams":          page = <TeamsView {...common} />; break;
     case "team_detail":    page = <TeamDetailView {...common} teamId={p.teamId} back={() => back("teams")} />; break;
     case "season_list":    page = <SeasonListView {...common} teamId={p.teamId} back={() => back("team_detail", { teamId: p.teamId })} />; break;
