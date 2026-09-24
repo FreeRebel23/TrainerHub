@@ -6,7 +6,7 @@ import {
 import { TYPE_DURATIONS } from "../lib/constants.js";
 import { uid, calcFactor } from "../lib/data.js";
 import {
-  exportSync, importSync, mySessions, exportAttendanceXLSX, downloadPlanTemplate,
+  exportSync, importSync, mySessions, exportAttendanceXLSX, exportTrainingLogXLSX, downloadPlanTemplate,
   importTrainingPlan, downloadBackup, readBackup,
 } from "../lib/io.js";
 import {
@@ -234,7 +234,7 @@ export function SettingsView({ data, update, pwa, theme }) {
           <Result msg={syncMsg} />
         </Section>
 
-        <Section title="Anwesenheitsliste (Excel)">
+        <Section title="Excel-Export">
           <div className="card form">
             {teams.length > 1 && (
               <Field label="Team">
@@ -248,17 +248,24 @@ export function SettingsView({ data, update, pwa, theme }) {
                   options={[{ value: "all", label: "Gesamt" }, ...(data.seasons ?? []).filter(s => s.teamId === expTid).map(s => ({ value: s.id, label: s.name }))]} />
               </Field>
             )}
-            <Button icon={FileSpreadsheet} className="self-start" onClick={() => exportAttendanceXLSX(data, expTid, expSid)} disabled={!expTid}>
-              Excel herunterladen
-            </Button>
+            <div className="btn-row">
+              <Button icon={FileSpreadsheet} onClick={() => exportTrainingLogXLSX(data, expTid)} disabled={!expTid}>
+                Trainingsbuch
+              </Button>
+              <Button icon={FileSpreadsheet} onClick={() => exportAttendanceXLSX(data, expTid, expSid)} disabled={!expTid}>
+                Anwesenheitsliste
+              </Button>
+            </div>
+            <p className="field__hint">Trainingsbuch: alle geplanten und erfassten Einheiten mit Schwerpunkt, Themen und Übungen – als Archiv oder zum Weitergeben.</p>
           </div>
         </Section>
 
         <Section title="Trainingsplan importieren">
           <div className="card form">
             <p className="field__hint">
-              CSV oder Excel mit den Spalten <strong>Datum, Trainingstyp, Dauer_min, Halle, Notiz</strong>.
-              Datum als JJJJ-MM-TT, z. B. 2026-09-02.
+              Zum einmaligen Übernehmen eines bestehenden Plans. CSV oder Excel mit Kopfzeile; Spalten in beliebiger
+              Reihenfolge: <strong>Datum</strong> (JJJJ-MM-TT), optional Uhrzeit, Trainingstyp, Dauer_min, Halle,
+              Schwerpunkt, Themen (mit ; getrennt), Notiz. Ältere Dateien funktionieren weiter.
             </p>
             {teams.length > 1 && (
               <Field label="Für Team">
