@@ -21,10 +21,12 @@ export default defineConfig({
       manifest: {
         name: "TrainerHub TV Bretten",
         short_name: "TrainerHub",
-        description: "Trainingsmanagement TV Bretten Basketball",
+        description: "Trainingsbuch, Anwesenheit und Saisonplanung für TV Bretten Basketball",
         lang: "de",
-        theme_color: "#f97316",
-        background_color: "#09090f",
+        // Neutral wie der App-Hintergrund (Light); zur Laufzeit setzt die App
+        // <meta name="theme-color"> passend zum gewählten Theme.
+        theme_color: "#fafaf9",
+        background_color: "#fafaf9",
         display: "standalone",
         orientation: "portrait",
         start_url: "./",
