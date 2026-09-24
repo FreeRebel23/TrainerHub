@@ -25,6 +25,8 @@ export const PHASES = {
 export const DURATIONS = [45, 60, 75, 90, 105, 120, 150];
 export const TYPE_DURATIONS = [30, 45, 60, 75, 90, 105, 120, 150];
 
+// Startdaten für neue Installationen. Ältere Datenstände können bei Trainingsarten und
+// Hallen noch ein Feld `emoji` enthalten – es wird nicht mehr verwendet und einfach ignoriert.
 export const INIT = {
   players: [
     { id: "p1", name: "Anna Müller",  birthYear: 2009, injured: false },
@@ -38,16 +40,16 @@ export const INIT = {
     playerIds: ["p1","p2","p3","p4","p5"],
   }],
   trainingTypes: [
-    { id: "tt1", name: "Basketball", duration: 90, emoji: "🏀" },
-    { id: "tt2", name: "Fitness",    duration: 60, emoji: "💪" },
-    { id: "tt3", name: "Taktik",     duration: 90, emoji: "🧠" },
-    { id: "tt4", name: "Technik",    duration: 75, emoji: "🎯" },
+    { id: "tt1", name: "Basketball", duration: 90 },
+    { id: "tt2", name: "Fitness",    duration: 60 },
+    { id: "tt3", name: "Taktik",     duration: 90 },
+    { id: "tt4", name: "Technik",    duration: 75 },
   ],
   venues: [
-    { id: "v1", name: "HSB Hallensportzentrum", address: "Sportzentrum 4",  emoji: "🏟️" },
-    { id: "v2", name: "TV-Halle",               address: "Withumanlage 7", emoji: "🏠" },
-    { id: "v3", name: "Jahnhalle",              address: "Postweg",        emoji: "🏛️" },
-    { id: "v4", name: "TV-Platz (Außen)",       address: "Außenanlage",    emoji: "🌤️" },
+    { id: "v1", name: "HSB Hallensportzentrum", address: "Sportzentrum 4" },
+    { id: "v2", name: "TV-Halle",               address: "Withumanlage 7" },
+    { id: "v3", name: "Jahnhalle",              address: "Postweg" },
+    { id: "v4", name: "TV-Platz (Außen)",       address: "Außenanlage" },
   ],
   sessions: [],
   plannedSessions: [],

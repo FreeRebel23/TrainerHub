@@ -25,6 +25,16 @@ describe("migrate", () => {
     expect(d.teams[0].players).toBeUndefined();
   });
 
+  it("bleibt kompatibel mit alten Datenständen, die noch ein emoji-Feld enthalten", () => {
+    const legacy = {
+      players: [], teams: [], sessions: [], plannedSessions: [], seasons: [], settings: { trainerName: "" },
+      trainingTypes: [{ id: "tt1", name: "Basketball", duration: 90, emoji: "🏀" }],
+      venues: [{ id: "v1", name: "Jahnhalle", address: "Postweg", emoji: "🏛️" }],
+    };
+    const d = migrate(JSON.parse(JSON.stringify(legacy)));
+    expect(d).toEqual(legacy);   // keine Migration nötig, Feld wird nur nicht mehr angezeigt
+  });
+
   it("lässt aktuelle Daten unverändert", () => {
     const cur = JSON.parse(JSON.stringify({ ...INIT, sessions: [{ id: "s" }] }));
     expect(migrate(JSON.parse(JSON.stringify(cur)))).toEqual(cur);

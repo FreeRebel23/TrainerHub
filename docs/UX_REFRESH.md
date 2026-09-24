@@ -37,8 +37,9 @@ Stand: 24.09.2026, Branch `trainerhub-next`. Ausgangslage siehe
 1. Werkzeug vor Dashboard: pro Screen eine erkennbare Hauptaktion.
 2. Karten nur für den einen Fokus (Start) und Formularblöcke, sonst Listen mit Haarlinien.
 3. Farbe transportiert Bedeutung (Akzent = Aktion/Auswahl, Status = Zustand), nie Dekoration.
-4. Keine Emoji in der Oberfläche. Emoji von Trainingsarten und Hallen bleiben als Daten
-   erhalten (Einstellungen, Druck).
+4. Keine Emoji in der Oberfläche. Das frühere Symbolfeld von Trainingsarten und Hallen wurde
+   entfernt. Ältere Datenstände und Backups dürfen `emoji` weiter enthalten; das Feld wird
+   ohne Migration ignoriert und beim Bearbeiten unverändert mitgeführt.
 5. Maximal Schriftgewicht 600, Labels in Normalschreibung, keine Versalien mit Sperrung.
 6. Bewegung nur zur Orientierung (Aufklappen, Theme-Wechsel, Update-Hinweis),
    `prefers-reduced-motion` wird respektiert.

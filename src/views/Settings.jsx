@@ -45,16 +45,10 @@ function Result({ msg }) {
 function TypeForm({ val, onChange, onSave, onCancel, submitLabel }) {
   return (
     <form className="card form expand" onSubmit={e => { e.preventDefault(); onSave(); }}>
-      <div className="form-inline">
-        <Field label="Symbol" htmlFor="tt-emoji">
-          <input id="tt-emoji" className="input input--emoji" value={val.emoji} maxLength={4}
-            onChange={e => onChange({ ...val, emoji: e.target.value })} />
-        </Field>
-        <Field label="Name" htmlFor="tt-name">
-            <input id="tt-name" className="input" value={val.name} autoFocus autoComplete="off"
-              onChange={e => onChange({ ...val, name: e.target.value })} placeholder="z. B. Wurftraining" />
-        </Field>
-      </div>
+      <Field label="Name" htmlFor="tt-name">
+        <input id="tt-name" className="input" value={val.name} autoFocus autoComplete="off"
+          onChange={e => onChange({ ...val, name: e.target.value })} placeholder="z. B. Wurftraining" />
+      </Field>
       <Field label="Standarddauer" aside={`Faktor ${String(calcFactor(val.duration)).replace(".", ",")}`}>
         <ChoiceChips label="Standarddauer" value={val.duration} onChange={v => onChange({ ...val, duration: v })}
           options={TYPE_DURATIONS.map(m => ({ value: m, label: `${m} min` }))} />
@@ -70,16 +64,10 @@ function TypeForm({ val, onChange, onSave, onCancel, submitLabel }) {
 function VenueForm({ val, onChange, onSave, onCancel, submitLabel }) {
   return (
     <form className="card form expand" onSubmit={e => { e.preventDefault(); onSave(); }}>
-      <div className="form-inline">
-        <Field label="Symbol" htmlFor="v-emoji">
-          <input id="v-emoji" className="input input--emoji" value={val.emoji} maxLength={4}
-            onChange={e => onChange({ ...val, emoji: e.target.value })} />
-        </Field>
-        <Field label="Name" htmlFor="v-name">
-            <input id="v-name" className="input" value={val.name} autoFocus autoComplete="off"
-              onChange={e => onChange({ ...val, name: e.target.value })} placeholder="Hallenname" />
-        </Field>
-      </div>
+      <Field label="Name" htmlFor="v-name">
+        <input id="v-name" className="input" value={val.name} autoFocus autoComplete="off"
+          onChange={e => onChange({ ...val, name: e.target.value })} placeholder="Hallenname" />
+      </Field>
       <Field label="Adresse / Kurzbezeichnung" htmlFor="v-addr">
         <input id="v-addr" className="input" value={val.address} autoComplete="off"
           onChange={e => onChange({ ...val, address: e.target.value })} />
@@ -176,7 +164,6 @@ export function SettingsView({ data, update, pwa, theme }) {
               );
               return (
                 <Row key={type.id}
-                  lead={<span className="emoji-lead" aria-hidden="true">{type.emoji}</span>}
                   title={type.name}
                   meta={<Meta items={[`${type.duration} min`, usedIn > 0 && `${usedIn}× verwendet`]} />}
                   trail={<>
@@ -191,7 +178,7 @@ export function SettingsView({ data, update, pwa, theme }) {
           </div>
           {typeEdit === "new"
             ? <TypeForm val={typeDraft} onChange={setTypeDraft} onSave={saveType} onCancel={() => setTypeEdit(null)} submitLabel="Hinzufügen" />
-            : <Button icon={Plus} className="self-start" onClick={() => { setTypeEdit("new"); setTypeDraft({ emoji: "🏀", name: "", duration: 90 }); }}>Trainingsart</Button>}
+            : <Button icon={Plus} className="self-start" onClick={() => { setTypeEdit("new"); setTypeDraft({ name: "", duration: 90 }); }}>Trainingsart</Button>}
         </Section>
 
         <Section title="Hallen">
@@ -206,7 +193,6 @@ export function SettingsView({ data, update, pwa, theme }) {
               );
               return (
                 <Row key={venue.id}
-                  lead={<span className="emoji-lead" aria-hidden="true">{venue.emoji}</span>}
                   title={venue.name}
                   meta={<Meta items={[venue.address, usedIn > 0 && `${usedIn}× genutzt`]} />}
                   trail={<>
@@ -221,7 +207,7 @@ export function SettingsView({ data, update, pwa, theme }) {
           </div>
           {venueEdit === "new"
             ? <VenueForm val={venueDraft} onChange={setVenueDraft} onSave={saveVenue} onCancel={() => setVenueEdit(null)} submitLabel="Hinzufügen" />
-            : <Button icon={Plus} className="self-start" onClick={() => { setVenueEdit("new"); setVenueDraft({ emoji: "🏠", name: "", address: "" }); }}>Halle</Button>}
+            : <Button icon={Plus} className="self-start" onClick={() => { setVenueEdit("new"); setVenueDraft({ name: "", address: "" }); }}>Halle</Button>}
         </Section>
 
         <Section title="Mit anderen Trainer:innen abgleichen">
