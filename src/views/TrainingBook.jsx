@@ -23,7 +23,7 @@ export function TrainingBookView({ data, go, params }) {
           { value: "list", label: "Liste", icon: List },
           { value: "calendar", label: "Kalender", icon: CalendarDays },
         ]} />
-        {mode === "list" ? <BookList data={data} go={go} /> : <BookCalendar data={data} go={go} params={params} />}
+        {mode === "list" ? <BookList data={data} go={go} params={params} /> : <BookCalendar data={data} go={go} params={params} />}
       </div>
     </div>
   );
@@ -34,11 +34,16 @@ function monthLabel(iso) {
   return `${MONTHS_DE[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-function BookList({ data, go }) {
+function BookList({ data, go, params }) {
   const today = todayISO();
   const teams = data.teams ?? [];
-  const [teamId, setTeamId] = useState("all");
-  const [query, setQuery]   = useState("");
+  // Suche und Filter liegen im Navigationszustand: nach "Zurück" aus einer Einheit
+  // (und nach Reload) sind sie unverändert.
+  const [teamId, setTeamIdState] = useState(params?.team ?? "all");
+  const [query, setQueryState]   = useState(params?.q ?? "");
+  const remember = patch => go("training", { ...params, ...patch }, { replace: true });
+  const setTeamId = v => { setTeamIdState(v); remember({ team: v }); };
+  const setQuery  = v => { setQueryState(v); remember({ q: v }); };
   const [allPlans, setAllPlans] = useState(false);
   const type  = id => byId(data.trainingTypes, id);
   const team  = id => byId(data.teams, id);
