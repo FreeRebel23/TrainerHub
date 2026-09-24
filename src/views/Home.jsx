@@ -27,7 +27,8 @@ export function HomeView({ data, go }) {
   const todaySess   = sessions.find(s => s.date === today);
   // Geplant, aber in den letzten 14 Tagen nicht erfasst → sollte nachgetragen werden
   const overdue     = plans.filter(p => p.date < today && p.date >= addDays(today, -14));
-  const upcoming    = plans.filter(p => p.date > today).slice(0, 3);
+  // Weitere heutige Planungen (z. B. zweites Team) bleiben sichtbar und direkt erfassbar
+  const upcoming    = plans.filter(p => p.date >= today && p !== todayPlan).slice(0, 3);
   const nextGame    = allGamedays(data).filter(g => g.date >= today).sort((a, b) => a.date.localeCompare(b.date))[0];
   // Nächste Trainings und nächstes Spiel chronologisch gemischt
   const agenda = [
@@ -105,7 +106,11 @@ export function HomeView({ data, go }) {
                   lead={<DateBlock iso={item.date} today={today} />}
                   title={type(item.trainingTypeId)?.name ?? "Training"}
                   meta={<Meta items={[relativeDay(item.date, today), ...planMeta(item)]} />}
-                  chevron onClick={() => go("calendar_day", { date: item.date })} />
+                  trail={item.date === today ? <span className="btn btn--sm btn--secondary" aria-hidden="true">Erfassen</span> : null}
+                  chevron={item.date !== today}
+                  onClick={() => item.date === today
+                    ? go("new_session", { plan: item })
+                    : go("calendar_day", { date: item.date })} />
               ) : (
                 <Row key={item.id}
                   lead={<DateBlock iso={item.date} today={today} />}
