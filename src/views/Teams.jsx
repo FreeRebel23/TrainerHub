@@ -6,6 +6,7 @@ import { todayISO, fmtRelative } from "../lib/dates.js";
 import {
   Button, IconButton, PageHeader, PageIntro, Section, Row, Meta, EmptyState, Field, cx,
 } from "../components/ui.jsx";
+import { useConfirm } from "../components/confirm.jsx";
 
 export function TeamsView({ data, update, go }) {
   const [showAdd, setShowAdd] = useState(false);
@@ -70,6 +71,7 @@ export function TeamDetailView({ data, update, teamId, back, go }) {
   const [newName,  setNewName]  = useState("");
   const [newYear,  setNewYear]  = useState("");
   const [selPick,  setSelPick]  = useState({});
+  const confirm = useConfirm();
 
   if (!team) {
     return (
@@ -117,8 +119,9 @@ export function TeamDetailView({ data, update, teamId, back, go }) {
     setSelPick({}); setShowPick(false);
   }
 
-  function removeFromTeam(p) {
-    if (!window.confirm(`${p.name} aus ${team.name} entfernen? Die Person und ihre Trainingshistorie bleiben erhalten.`)) return;
+  async function removeFromTeam(p) {
+    if (!(await confirm({ title: `${p.name} aus ${team.name} entfernen?`, confirmLabel: "Entfernen", danger: true,
+      text: "Die Person und ihre bisherige Trainingshistorie bleiben erhalten." }))) return;
     update(d => ({
       ...d,
       teams: d.teams.map(t => t.id !== teamId ? t : {

@@ -4,6 +4,7 @@ import { useTheme } from "./lib/theme.js";
 import { usePwaUpdate } from "./usePwaUpdate.js";
 import { AppShell } from "./components/AppShell.jsx";
 import { Button } from "./components/ui.jsx";
+import { ConfirmProvider } from "./components/confirm.jsx";
 import { HomeView } from "./views/Home.jsx";
 import { TrainingBookView } from "./views/TrainingBook.jsx";
 import { CalendarDayView } from "./views/CalendarDay.jsx";
@@ -59,7 +60,8 @@ export default function App() {
     case "training":       page = <TrainingBookView {...common} params={p} />; break;
     case "calendar_day":   page = <CalendarDayView {...common} date={p.date} back={() => back("training", { mode: "calendar" })} />; break;
     case "new_session":    page = <NewSessionView {...common} params={p} onSave={saveSession} back={() => back("training")} />; break;
-    case "session_detail": page = <SessionDetailView {...common} sessionId={p.sessionId} back={() => back("training")} onDelete={deleteSession} />; break;
+    case "session_detail": page = <SessionDetailView {...common} sessionId={p.sessionId} editing={!!p.edit}
+                             back={() => back(p.edit ? "session_detail" : "training", p.edit ? { sessionId: p.sessionId } : {})} onDelete={deleteSession} />; break;
     case "teams":          page = <TeamsView {...common} />; break;
     case "team_detail":    page = <TeamDetailView {...common} teamId={p.teamId} back={() => back("teams")} />; break;
     case "season_list":    page = <SeasonListView {...common} teamId={p.teamId} back={() => back("team_detail", { teamId: p.teamId })} />; break;
@@ -72,7 +74,8 @@ export default function App() {
   }
 
   return (
-    <AppShell view={v} go={go} theme={theme} focus={FOCUS_VIEWS.has(v)}>
+    <ConfirmProvider>
+    <AppShell view={v} go={go} theme={theme} focus={FOCUS_VIEWS.has(v) || (v === "session_detail" && !!p.edit)}>
       {/* key: Wechsel zu einem anderen Datensatz setzt lokalen Zustand zurück. Assistent-Schritte
           und Ansichtsmodi des Trainingsbuchs behalten ihn. */}
       <div key={KEEP_STATE.has(v) ? v : v + JSON.stringify(p)}>{page}</div>
@@ -83,5 +86,6 @@ export default function App() {
         </div>
       )}
     </AppShell>
+    </ConfirmProvider>
   );
 }

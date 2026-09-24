@@ -12,6 +12,7 @@ import {
 import {
   Button, IconButton, PageIntro, Section, Row, Meta, Field, ChoiceChips, Segmented, Notice,
 } from "../components/ui.jsx";
+import { useConfirm } from "../components/confirm.jsx";
 
 // Datei-Eingabe als Listenzeile (Label umschließt das versteckte input)
 function FileRow({ icon: Icon, title, meta, accept, onFile }) {
@@ -106,6 +107,7 @@ export function SettingsView({ data, update, pwa, theme }) {
   const [impTid, setImpTid]   = useState(teams[0]?.id ?? "");
   const [impMsg, setImpMsg]   = useState(null);
   const [backupMsg, setBackupMsg] = useState(null);
+  const confirm = useConfirm();
 
   // ─── Trainingsarten ───
   function saveType() {
@@ -118,9 +120,9 @@ export function SettingsView({ data, update, pwa, theme }) {
     }
     setTypeEdit(null);
   }
-  function deleteType(type) {
+  async function deleteType(type) {
     if ((data.sessions ?? []).some(s => s.trainingTypeId === type.id)) return;
-    if (!window.confirm(`Trainingsart „${type.name}“ löschen?`)) return;
+    if (!(await confirm({ title: `Trainingsart „${type.name}“ löschen?`, confirmLabel: "Löschen", danger: true }))) return;
     update(d => ({ ...d, trainingTypes: d.trainingTypes.filter(t => t.id !== type.id) }));
   }
 
@@ -135,8 +137,8 @@ export function SettingsView({ data, update, pwa, theme }) {
     }
     setVenueEdit(null);
   }
-  function deleteVenue(venue) {
-    if (!window.confirm(`Halle „${venue.name}“ löschen?`)) return;
+  async function deleteVenue(venue) {
+    if (!(await confirm({ title: `Halle „${venue.name}“ löschen?`, confirmLabel: "Löschen", danger: true }))) return;
     update(d => ({ ...d, venues: d.venues.filter(v => v.id !== venue.id) }));
   }
 
@@ -305,8 +307,9 @@ export function SettingsView({ data, update, pwa, theme }) {
               onClick={() => downloadBackup(data)} />
             <FileRow icon={HardDriveUpload} title="Backup wiederherstellen" meta="Ersetzt alle Daten auf diesem Gerät" accept=".json"
               onFile={f => readBackup(f,
-                imp => {
-                  if (!window.confirm(`Backup mit ${imp.sessions.length} Trainings einspielen? Alle aktuellen Daten auf diesem Gerät werden ersetzt.`)) return;
+                async imp => {
+                  if (!(await confirm({ title: "Backup wiederherstellen?", confirmLabel: "Ersetzen", danger: true,
+                    text: `Das Backup enthält ${imp.sessions.length} Trainings. Alle aktuellen Daten auf diesem Gerät werden ersetzt.` }))) return;
                   update(() => imp);
                   setBackupMsg({ ok: true, text: "Backup wiederhergestellt." });
                 },
@@ -325,8 +328,8 @@ export function SettingsView({ data, update, pwa, theme }) {
               </span>
               {pwa?.needRefresh
                 ? <Button variant="primary" size="sm" onClick={pwa.applyUpdate}>Installieren</Button>
-                : <Button size="sm" onClick={pwa?.checkForUpdate} disabled={pwa?.checking}>
-                    {pwa?.checking ? "Prüfe …" : "Nach Updates suchen"}
+                : <Button size="sm" onClick={pwa?.checkForUpdate} disabled={pwa?.checking} aria-label="Nach Updates suchen">
+                    {pwa?.checking ? "Prüfe …" : "Prüfen"}
                   </Button>}
             </div>
             <div className="row">

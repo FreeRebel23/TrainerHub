@@ -6,6 +6,7 @@ import { DURATIONS } from "../lib/constants.js";
 import {
   Button, IconButton, PageHeader, Section, Row, Meta, Notice, Field, ChoiceChips,
 } from "../components/ui.jsx";
+import { useConfirm } from "../components/confirm.jsx";
 
 // Ein Kalendertag: was wurde trainiert, was ist geplant, neues Training planen.
 export function CalendarDayView({ data, update, date, go, back }) {
@@ -17,6 +18,7 @@ export function CalendarDayView({ data, update, date, go, back }) {
   const [typeId, setTypeId]   = useState(types[0]?.id ?? "");
   const [dur, setDur]         = useState(types[0]?.duration ?? 90);
   const [venueId, setVenueId] = useState(venues[0]?.id ?? "");
+  const confirm = useConfirm();
 
   const today     = todayISO();
   const canRecord = date <= today;
@@ -38,8 +40,9 @@ export function CalendarDayView({ data, update, date, go, back }) {
     setShowPlan(false);
   }
 
-  function deletePlanned(p) {
-    if (!window.confirm(`Geplantes Training „${type(p.trainingTypeId)?.name ?? "Training"}“ am ${fmtDateFull(date)} löschen?`)) return;
+  async function deletePlanned(p) {
+    if (!(await confirm({ title: "Geplantes Training löschen?", danger: true, confirmLabel: "Löschen",
+      text: `${type(p.trainingTypeId)?.name ?? "Training"} am ${fmtDateFull(date)}` }))) return;
     update(d => ({ ...d, plannedSessions: (d.plannedSessions ?? []).filter(x => x.id !== p.id) }));
   }
 

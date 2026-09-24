@@ -7,15 +7,18 @@ import { printSession } from "../lib/io.js";
 import {
   Button, IconButton, PageHeader, Section, Meta, EmptyState, Notice, cx,
 } from "../components/ui.jsx";
+import { useConfirm } from "../components/confirm.jsx";
 import { AttendanceList, DrillList } from "../components/training.jsx";
 
 // Eine Trainingseinheit: Inhalt zuerst, Aktionen zurückhaltend.
-export function SessionDetailView({ data, update, sessionId, back, onDelete }) {
+// Bearbeiten ist eine eigene Navigationsebene (params.edit): ohne Tab-Leiste, Zurück bzw.
+// Wischgeste bricht ab, ein versehentlicher Tab-Wechsel kann keine Eingaben verwerfen.
+export function SessionDetailView({ data, update, sessionId, editing, go, back, onDelete }) {
   const sess = (data.sessions ?? []).find(s => s.id === sessionId);
-  const [editing,  setEditing]  = useState(false);
-  const [editNote, setEditNote] = useState("");
-  const [editAtt,  setEditAtt]  = useState([]);
-  const [editCL,   setEditCL]   = useState([]);
+  const [editNote, setEditNote] = useState(() => sess?.note ?? "");
+  const [editAtt,  setEditAtt]  = useState(() => (sess?.attendance ?? []).map(a => ({ ...a })));
+  const [editCL,   setEditCL]   = useState(() => (sess?.checklist ?? []).map(d => ({ ...d })));
+  const confirm = useConfirm();
 
   if (!sess) {
     return (
@@ -37,12 +40,7 @@ export function SessionDetailView({ data, update, sessionId, back, onDelete }) {
   const drills    = sess.checklist ?? [];
   const title     = type?.name ?? "Training";
 
-  function startEdit() {
-    setEditNote(sess.note ?? "");
-    setEditAtt(att.map(a => ({ ...a })));
-    setEditCL(drills.map(d => ({ ...d })));
-    setEditing(true);
-  }
+  const startEdit = () => go("session_detail", { sessionId, edit: true });
 
   function saveEdit() {
     update(d => ({
@@ -51,7 +49,7 @@ export function SessionDetailView({ data, update, sessionId, back, onDelete }) {
         ...s, note: editNote.trim(), attendance: editAtt, checklist: editCL,
       }),
     }));
-    setEditing(false);
+    back();
   }
 
   // Übungen lassen sich direkt abhaken – z. B. während des Trainings in der Halle
@@ -59,8 +57,9 @@ export function SessionDetailView({ data, update, sessionId, back, onDelete }) {
     update(d => ({ ...d, sessions: d.sessions.map(s => s.id !== sessionId ? s : { ...s, checklist }) }));
   }
 
-  function remove() {
-    if (window.confirm(`Training „${title}“ vom ${fmtDateLong(sess.date)} wirklich löschen?`)) onDelete(sess.id);
+  async function remove() {
+    if (await confirm({ title: "Training löschen?", danger: true, confirmLabel: "Löschen",
+      text: `${title} vom ${fmtDateLong(sess.date)} mit Anwesenheit, Notiz und Übungen. Das lässt sich nicht rückgängig machen.` })) onDelete(sess.id);
   }
 
   const head = (
@@ -76,7 +75,7 @@ export function SessionDetailView({ data, update, sessionId, back, onDelete }) {
     const setStatus = (pid, status) => setEditAtt(prev => prev.map(a => a.playerId === pid ? { ...a, status } : a));
     return (
       <div className="page">
-        <PageHeader title="Training bearbeiten" back={() => setEditing(false)} />
+        <PageHeader title="Training bearbeiten" back={back} />
         <div className="page-body">
           {head}
           <Section title="Notiz">
@@ -91,7 +90,7 @@ export function SessionDetailView({ data, update, sessionId, back, onDelete }) {
           </Section>
         </div>
         <div className="action-bar">
-          <Button variant="ghost" onClick={() => setEditing(false)}>Abbrechen</Button>
+          <Button variant="ghost" onClick={back}>Abbrechen</Button>
           <Button variant="primary" onClick={saveEdit}>Speichern</Button>
         </div>
       </div>

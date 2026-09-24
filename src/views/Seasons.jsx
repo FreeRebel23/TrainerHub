@@ -6,6 +6,7 @@ import { todayISO, fmtDate, getHoliday, getSchoolHoliday, parseISO } from "../li
 import {
   Button, IconButton, PageHeader, Section, Row, Meta, EmptyState, Field, ChoiceChips, Segmented, Notice, cx,
 } from "../components/ui.jsx";
+import { useConfirm } from "../components/confirm.jsx";
 
 function PhaseStatus({ phase }) {
   const ph = PHASES[phase] ?? PHASES.offseason;
@@ -95,6 +96,7 @@ export function SeasonDetailView({ data, update, seasonId, go, back }) {
   const season = (data.seasons ?? []).find(s => s.id === seasonId);
   const [showAddGame, setShowAddGame] = useState(false);
   const [gd, setGd] = useState({ date: todayISO(), opponent: "", isHome: true, result: "" });
+  const confirm = useConfirm();
 
   if (!season) {
     return (
@@ -130,8 +132,9 @@ export function SeasonDetailView({ data, update, seasonId, go, back }) {
     setShowAddGame(false);
   }
 
-  function delGameday(g) {
-    if (!window.confirm(`Spieltag ${fmtDate(g.date)}${g.opponent ? " gegen " + g.opponent : ""} löschen?`)) return;
+  async function delGameday(g) {
+    if (!(await confirm({ title: "Spieltag löschen?", danger: true, confirmLabel: "Löschen",
+      text: `${fmtDate(g.date)}${g.opponent ? (g.isHome ? " gegen " : " bei ") + g.opponent : ""}` }))) return;
     update(d => ({
       ...d,
       seasons: d.seasons.map(s => s.id !== seasonId ? s : {
