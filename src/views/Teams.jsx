@@ -181,10 +181,10 @@ export function TeamDetailView({ data, update, teamId, back, go }) {
                         verletzt
                       </button>
                     ) : (
-                      <IconButton icon={Bandage} size={18} label={`${p.name} als verletzt markieren`}
+                      <IconButton icon={Bandage} size={18} variant="quiet" label={`${p.name} als verletzt markieren`}
                         aria-pressed="false" onClick={() => toggleInjured(p.id)} />
                     )}
-                    <IconButton icon={X} size={18} label={`${p.name} aus dem Team entfernen`} onClick={() => removeFromTeam(p)} />
+                    <IconButton icon={X} size={18} variant="quiet" label={`${p.name} aus dem Team entfernen`} onClick={() => removeFromTeam(p)} />
                   </div>
                 );
               })}

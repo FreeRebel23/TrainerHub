@@ -206,6 +206,7 @@ button:disabled { cursor: not-allowed; }
 .icon-btn--danger { color: var(--danger); }
 .icon-btn--danger:hover:not(:disabled) { background: var(--danger-subtle); color: var(--danger); }
 .icon-btn--accent { color: var(--accent); }
+.icon-btn--quiet { color: var(--text-3); }
 
 .btn-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .btn-row > .btn { flex: 1 1 auto; }
