@@ -5,6 +5,8 @@ import {
   getHoliday, getSchoolHoliday, parseISO,
 } from "../lib/dates.js";
 import { byId, countPresent, openPlans, allGamedays } from "../lib/data.js";
+import { content, matchesQuery, byDateTime, normalizeTags, planStatus } from "../lib/training.js";
+import { PlanStatus } from "../components/PlanStatus.jsx";
 import {
   Button, PageIntro, Section, Row, Meta, DateBlock, EmptyState, ChoiceChips, Segmented, IconButton, cx,
 } from "../components/ui.jsx";
@@ -17,7 +19,10 @@ export function TrainingBookView({ data, go, params }) {
   return (
     <div className={cx("page", mode === "calendar" && "page--wide")}>
       <PageIntro title="Trainingsbuch"
-        actions={<Button variant="primary" size="sm" icon={Plus} onClick={() => go("new_session")}>Erfassen</Button>} />
+        actions={<>
+          <Button size="sm" variant="ghost" onClick={() => go("new_session")}>Erfassen</Button>
+          <Button variant="primary" size="sm" icon={Plus} onClick={() => go("plan_edit")}>Planen</Button>
+        </>} />
       <div className="page-body">
         <Segmented label="Ansicht" value={mode} onChange={setMode} options={[
           { value: "list", label: "Liste", icon: List },
@@ -41,33 +46,35 @@ function BookList({ data, go, params }) {
   // (und nach Reload) sind sie unverändert.
   const [teamId, setTeamIdState] = useState(params?.team ?? "all");
   const [query, setQueryState]   = useState(params?.q ?? "");
+  const [tag, setTagState]       = useState(params?.tag ?? "all");
   const remember = patch => go("training", { ...params, ...patch }, { replace: true });
   const setTeamId = v => { setTeamIdState(v); remember({ team: v }); };
   const setQuery  = v => { setQueryState(v); remember({ q: v }); };
+  const setTag    = v => { setTagState(v); remember({ tag: v }); };
   const [allPlans, setAllPlans] = useState(false);
   const type  = id => byId(data.trainingTypes, id);
   const team  = id => byId(data.teams, id);
   const venue = id => byId(data.venues, id);
   const multiTeam = teams.length > 1;
-  const inTeam = x => teamId === "all" || x.teamId === teamId;
 
-  const q = query.trim().toLowerCase();
-  const matches = s => !q || [
-    type(s.trainingTypeId)?.name, s.note, venue(s.venueId)?.name, team(s.teamId)?.name,
-    ...(s.checklist ?? []).map(d => d.text),
-  ].some(t => (t ?? "").toLowerCase().includes(q));
+  // Themenfilter nur, wenn Themen tatsächlich verwendet werden
+  const usedTags = useMemo(() => normalizeTags([...(data.sessions ?? []), ...(data.plannedSessions ?? [])]
+    .flatMap(x => content(x).tags)), [data.sessions, data.plannedSessions]);
+  const tagKey = tag.toLocaleLowerCase("de");
+  const q = query.trim();
+  const keep = x => (teamId === "all" || x.teamId === teamId)
+    && (tag === "all" || content(x).tags.some(t => t.toLocaleLowerCase("de") === tagKey))
+    && matchesQuery(x, q, data);
+  const filtering = !!q || tag !== "all";
 
-  const sessions = useMemo(() => [...(data.sessions ?? [])]
-    .filter(inTeam).filter(matches)
-    .sort((a, b) => b.date.localeCompare(a.date)),
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  [data.sessions, teamId, q]);
+  const sessions = [...(data.sessions ?? [])].filter(keep)
+    .sort((a, b) => byDateTime(b, a));
 
-  const plans = [...openPlans(data)]
-    .filter(inTeam)
-    .filter(p => p.date >= addDays(today, -14))
-    .sort((a, b) => a.date.localeCompare(b.date));
-  const shownPlans = allPlans ? plans : plans.slice(0, 4);
+  // Offene Planungen: kommende und die der letzten 14 Tage (beim Suchen/Filtern alle)
+  const plans = openPlans(data).filter(keep)
+    .filter(p => filtering || p.date >= addDays(today, -14))
+    .sort(byDateTime);
+  const shownPlans = allPlans || filtering ? plans : plans.slice(0, 5);
 
   const groups = [];
   sessions.forEach(s => {
@@ -83,36 +90,40 @@ function BookList({ data, go, params }) {
           <Search size={18} className="search__icon" aria-hidden="true" />
           <label htmlFor="book-search" className="sr-only">Trainings durchsuchen</label>
           <input id="book-search" className="input search__input" type="search" value={query}
-            onChange={e => setQuery(e.target.value)} placeholder="Suchen: Notiz, Übung, Halle …" enterKeyHint="search" />
+            onChange={e => setQuery(e.target.value)} placeholder="Suchen: Schwerpunkt, Übung, Notiz …" enterKeyHint="search" />
         </div>
         {multiTeam && (
           <ChoiceChips label="Team filtern" scroll value={teamId} onChange={setTeamId}
             options={[{ value: "all", label: "Alle Teams" }, ...teams.map(t => ({ value: t.id, label: t.name }))]} />
         )}
+        {usedTags.length > 0 && (
+          <ChoiceChips label="Nach Thema filtern" scroll value={tag} onChange={setTag}
+            options={[{ value: "all", label: "Alle Themen" }, ...usedTags.map(t => ({ value: t, label: t }))]} />
+        )}
       </div>
 
-      {!q && plans.length > 0 && (
+      {plans.length > 0 && (
         <Section title="Geplant" hint={`${plans.length}`}>
           <div className="list">
             {shownPlans.map(p => {
+              const c = content(p);
               const overdue = p.date < today;
-              const canRecord = p.date <= today;
               return (
                 <Row key={p.id}
                   lead={<DateBlock iso={p.date} today={today} />}
                   title={type(p.trainingTypeId)?.name ?? "Training"}
                   meta={<>
-                    <Meta items={[relativeDay(p.date, today), multiTeam && team(p.teamId)?.name, `${p.durationMinutes} min`, venue(p.venueId)?.name]} />
+                    <Meta items={[relativeDay(p.date, today), c.time && `${c.time} Uhr`, multiTeam && team(p.teamId)?.name, `${p.durationMinutes} min`, venue(p.venueId)?.name]} />
                     {overdue && <> <span className="tag tone-warning">nicht erfasst</span></>}
                     {getHoliday(p.date) && <> <span className="tag tone-danger">Feiertag</span></>}
                   </>}
-                  trail={canRecord ? <span className="btn btn--sm btn--secondary" aria-hidden="true">Erfassen</span> : null}
-                  chevron={!canRecord}
-                  onClick={() => canRecord ? go("new_session", { plan: p }) : go("calendar_day", { date: p.date })} />
+                  excerpt={c.focus || (c.checklist.length ? c.checklist.map(d => d.text).join(" · ") : null)}
+                  trail={<PlanStatus status={planStatus(p)} label={planStatus(p) === "planned" ? "offen" : undefined} />}
+                  chevron onClick={() => go("plan_detail", { planId: p.id })} />
               );
             })}
           </div>
-          {plans.length > 4 && (
+          {plans.length > 5 && !filtering && (
             <button type="button" className="btn btn--accent-ghost btn--sm self-start"
               onClick={() => setAllPlans(v => !v)}>
               {allPlans ? "Weniger anzeigen" : `Alle ${plans.length} geplanten anzeigen`}
@@ -122,23 +133,21 @@ function BookList({ data, go, params }) {
       )}
 
       {groups.length === 0 ? (
-        q ? <EmptyState icon={Search} title="Keine Treffer" text={`Kein Training passt zu „${query.trim()}“.`} />
+        filtering ? (plans.length === 0 && <EmptyState icon={Search} title="Keine Treffer" text={q ? `Kein Training passt zu „${q}“.` : "Kein Training mit diesem Thema."} />)
           : <EmptyState icon={BookOpen} title="Noch keine Trainings"
-              text="Hier entsteht die Trainingshistorie deiner Mannschaft."
-              action={<Button variant="primary" icon={Plus} onClick={() => go("new_session")}>Training erfassen</Button>} />
+              text="Plane dein nächstes Training oder erfasse eines, das schon stattgefunden hat."
+              action={<Button variant="primary" icon={Plus} onClick={() => go("plan_edit")}>Training planen</Button>} />
       ) : groups.map(g => (
         <Section key={g.key} title={g.label} hint={`${g.items.length} ${g.items.length === 1 ? "Training" : "Trainings"}`}>
           <div className="list">
             {g.items.map(s => {
-              const drills = s.checklist ?? [];
+              const c = content(s);
               return (
                 <Row key={s.id}
                   lead={<DateBlock iso={s.date} today={today} />}
                   title={type(s.trainingTypeId)?.name ?? "Training"}
-                  meta={<>
-                    <Meta items={[multiTeam && team(s.teamId)?.name, `${countPresent(s)}/${(s.attendance ?? []).length} dabei`, `${s.durationMinutes} min`, venue(s.venueId)?.name]} />
-                  </>}
-                  excerpt={s.note || (drills.length ? drills.map(d => d.text).join(" · ") : null)}
+                  meta={<Meta items={[multiTeam && team(s.teamId)?.name, `${countPresent(s)}/${(s.attendance ?? []).length} dabei`, `${s.durationMinutes} min`, c.tags.slice(0, 2).join(", ")]} />}
+                  excerpt={c.focus || c.note || (c.checklist.length ? c.checklist.map(d => d.text).join(" · ") : null)}
                   chevron onClick={() => go("session_detail", { sessionId: s.id })} />
               );
             })}
