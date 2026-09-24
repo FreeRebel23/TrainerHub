@@ -66,7 +66,56 @@ Drill { id, text, done, minutes?: number, note?: string }
 (`src/lib/training.js`). Gespeicherte Daten werden **nicht** umgeschrieben. Alte Backups, Sync-Dateien
 und Importe bleiben gültig. Der Storage-Key bleibt `trainerhub_v1`.
 
-## Umsetzungspakete
+## Der Workflow in TrainerHub
+
+| Schritt | Wo | Was passiert |
+| --- | --- | --- |
+| **Planen** | Trainingsbuch → „Planen“, Kalendertag → „Training planen“, Start | Schnell: Datum wählen, speichern. Team, Art, Dauer, Halle und Uhrzeit sind vorbelegt (letzte Einheit des Teams, bevorzugt gleicher Wochentag). |
+| **Vorbereiten** | Planung → „Vorbereiten“/„Bearbeiten“ | Uhrzeit, Schwerpunkt, Themen, Übungen (Dauer, Beschreibung, Reihenfolge), Notiz. Die Summe der Übungsdauern wird neben der Trainingsdauer gezeigt, aber nicht erzwungen. |
+| **Durchführen** | Start → „Training starten“ bzw. Planung → „Training starten“ (ab dem Trainingstag) | Direkt zur Anwesenheit; Schwerpunkt, Themen, Vorbereitungsnotiz und Übungen sind da. Übungen abhaken, spontan ergänzen, Schwerpunkt/Themen anpassen, Beobachtungen notieren. Ein Entwurf wird ab der ersten Eingabe laufend gesichert und nach einem Beenden der PWA wiederhergestellt. |
+| **Abschließen** | „Training abschließen“ | Das erfasste Training speichert, was tatsächlich passiert ist (inkl. `planId`); die Planung behält, was geplant war, und gilt als durchgeführt. |
+| **Wiederverwenden** | Planung oder Training → „Duplizieren“ | Neue Planung mit Inhalt und Übungen, Datum neu wählen. |
+| **Saison verstehen** | Auswertung → „Inhalte“ | Themen (Einheiten, Minuten), häufigste Schwerpunkte, Einheiten je Monat, Übungsquote; Standard ist die laufende Saison. |
+
+Status im Trainingsbuch und auf Start: Ring = offen, halb gefüllt = vorbereitet,
+gefüllt = durchgeführt (abgeleitet aus den Daten, nie gespeichert).
+
+## Import, Export, Backup, Sync
+
+- **Import (CSV/XLSX):** Spalten werden über die Kopfzeile erkannt (beliebige Reihenfolge):
+  Datum, Uhrzeit, Trainingstyp, Dauer_min, Halle, Schwerpunkt, Themen (`;`-getrennt), Notiz.
+  Dateien ohne erkannte Kopfzeile nutzen weiter die alte Reihenfolge. Neu: Die Spalte „Notiz“
+  wird übernommen (wurde vorher verworfen), eine leere Halle ordnet nicht mehr die erste Halle zu.
+- **Export:** „Trainingsbuch“ (Einstellungen → Excel-Export bzw. Auswertung → Inhalte → Excel):
+  alle geplanten und erfassten Einheiten mit Uhrzeit, Status, Schwerpunkt, Themen, Übungen,
+  Übungsquote, Anwesenheit, Notiz. Anwesenheitsliste und Beteiligungs-Export sind unverändert.
+- **Druck:** Planung als Trainingsblatt (für die Halle/Co-Training); der Druck eines Trainings
+  enthält jetzt Schwerpunkt, Themen und Übungsdauer.
+- **Backup/Restore:** unverändert das gesamte Datenobjekt – neue Felder sind automatisch enthalten
+  (getestet: Phase-2-Backup und Phase-1-Backup).
+- **Datei-Sync:** unverändert generisch, neue Felder erledigter Trainings werden übertragen
+  (getestet). Planungen werden – wie bisher – nicht synchronisiert.
+
+## Kompatibilität (geprüft)
+
+- Phase-1-Datenstand im Browser in allen 16 Ansichten geöffnet, inkl. Planen/Durchführen/Bearbeiten:
+  gespeicherter Stand danach byteidentisch (kein stilles Umschreiben).
+- Leerer Datenstand (Neuinstallation): Leerzustände, Schnellplanung funktioniert.
+- Alte Planung ohne neue Felder: Status „offen“, vorbereitbar, startbar.
+- Alte Trainings ohne neue Felder: anzeigen, bearbeiten, duplizieren.
+- Alte Trainingsarten/Hallen (mit `emoji`), alte Importdateien, Phase-1-Backups: Tests.
+
+## Bewusst nicht gebaut
+
+- **Serienplanung** (wiederkehrende Termine): kein Bestand im Datenmodell; Duplizieren deckt die
+  Wiederverwendung ab. Sinnvoll als späterer Baustein („jeden Di/Do 18:30 bis Saisonende“).
+- **Eigene Vorlagenverwaltung:** gute Einheiten sind die Vorlagen (Duplizieren).
+- **Minuten je Thema auf Übungsebene:** Themen hängen an der Einheit, nicht an der Übung – genauere
+  Minuten wären vorgetäuscht.
+- **Sync von Planungen** zwischen Geräten: Phase 3 (Server).
+
+## Umsetzungspakete (erledigt)
+
 
 1. Fachlogik `src/lib/training.js` (Normalisierung, Status, Duplizieren, Plan → Training, Suche,
    Saisonaggregation, Defaults) mit Tests
