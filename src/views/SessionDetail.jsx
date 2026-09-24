@@ -1,14 +1,15 @@
 import { useState } from "react";
-import { Pencil, Printer, Trash2, Sun, SearchX } from "lucide-react";
+import { Pencil, Printer, Trash2, Sun, SearchX, Copy } from "lucide-react";
 import { fmtDateLong, getSchoolHoliday } from "../lib/dates.js";
 import { STATUSES, STATUS_KEYS } from "../lib/constants.js";
 import { byId, countPresent } from "../lib/data.js";
 import { printSession } from "../lib/io.js";
 import {
-  Button, IconButton, PageHeader, Section, Meta, EmptyState, Notice, cx,
+  Button, IconButton, PageHeader, Section, Meta, EmptyState, Notice, Field, cx,
 } from "../components/ui.jsx";
 import { useConfirm } from "../components/confirm.jsx";
-import { AttendanceList, DrillList } from "../components/training.jsx";
+import { AttendanceList, DrillList, TagPicker, TagList } from "../components/training.jsx";
+import { normalizeDrill, normalizeTags, knownTags } from "../lib/training.js";
 
 // Eine Trainingseinheit: Inhalt zuerst, Aktionen zurückhaltend.
 // Bearbeiten ist eine eigene Navigationsebene (params.edit): ohne Tab-Leiste, Zurück bzw.
@@ -18,6 +19,8 @@ export function SessionDetailView({ data, update, sessionId, editing, go, back, 
   const [editNote, setEditNote] = useState(() => sess?.note ?? "");
   const [editAtt,  setEditAtt]  = useState(() => (sess?.attendance ?? []).map(a => ({ ...a })));
   const [editCL,   setEditCL]   = useState(() => (sess?.checklist ?? []).map(d => ({ ...d })));
+  const [editFocus, setEditFocus] = useState(() => sess?.focus ?? "");
+  const [editTags,  setEditTags]  = useState(() => sess?.tags ?? []);
   const confirm = useConfirm();
 
   if (!sess) {
@@ -46,7 +49,9 @@ export function SessionDetailView({ data, update, sessionId, editing, go, back, 
     update(d => ({
       ...d,
       sessions: d.sessions.map(s => s.id !== sessionId ? s : {
-        ...s, note: editNote.trim(), attendance: editAtt, checklist: editCL,
+        ...s, note: editNote.trim(), attendance: editAtt,
+        checklist: editCL.map(normalizeDrill).filter(dr => dr.text),
+        focus: editFocus.trim(), tags: normalizeTags(editTags),
       }),
     }));
     back();
@@ -64,7 +69,7 @@ export function SessionDetailView({ data, update, sessionId, editing, go, back, 
 
   const head = (
     <div className="detail-head">
-      <p className="detail-head__eyebrow">{fmtDateLong(sess.date)}</p>
+      <p className="detail-head__eyebrow">{fmtDateLong(sess.date)}{sess.time && ` · ${sess.time} Uhr`}</p>
       <h2 className="detail-head__title">{title}</h2>
       <p className="detail-head__meta"><Meta items={[team?.name, venue?.name]} /></p>
     </div>
@@ -78,12 +83,19 @@ export function SessionDetailView({ data, update, sessionId, editing, go, back, 
         <PageHeader title="Training bearbeiten" back={back} />
         <div className="page-body">
           {head}
-          <Section title="Notiz">
-            <textarea className="textarea" aria-label="Trainingsnotiz" value={editNote}
-              onChange={e => setEditNote(e.target.value)} rows={4} placeholder="Schwerpunkt, Beobachtungen …" />
-          </Section>
+          <Field label="Schwerpunkt" htmlFor="se-focus">
+            <input id="se-focus" className="input" value={editFocus} onChange={e => setEditFocus(e.target.value)}
+              placeholder="Was wurde trainiert?" />
+          </Field>
+          <Field label="Themen">
+            <TagPicker value={editTags} onChange={setEditTags} options={knownTags(data)} />
+          </Field>
           <Section title="Übungen">
             <DrillList items={editCL} onChange={setEditCL} />
+          </Section>
+          <Section title="Beobachtungen">
+            <textarea className="textarea" aria-label="Beobachtungen und Notizen" value={editNote}
+              onChange={e => setEditNote(e.target.value)} rows={4} placeholder="Was lief gut, was nicht?" />
           </Section>
           <Section title="Anwesenheit" hint={`${editAtt.filter(a => ["present", "injured_present"].includes(a.status)).length} von ${editAtt.length} dabei`}>
             <AttendanceList rows={editAtt} getPlayer={getPlayer} onChange={setStatus} />
@@ -103,6 +115,7 @@ export function SessionDetailView({ data, update, sessionId, editing, go, back, 
   return (
     <div className="page">
       <PageHeader title="Training" back={back} actions={<>
+        <IconButton icon={Copy} label="Als neue Planung duplizieren" onClick={() => go("plan_edit", { from: { kind: "session", id: sess.id } })} />
         <IconButton icon={Printer} label="Drucken" onClick={() => printSession(sess, data)} />
         <IconButton icon={Trash2} label="Training löschen" variant="danger" onClick={remove} />
       </>} />
@@ -117,17 +130,27 @@ export function SessionDetailView({ data, update, sessionId, editing, go, back, 
 
         {schoolHol && <Notice tone="warning" icon={Sun}>{schoolHol.name} – Ferientraining</Notice>}
 
-        <Button icon={Pencil} onClick={startEdit} className="self-start">Bearbeiten</Button>
+        <div className="btn-row">
+          <Button icon={Pencil} onClick={startEdit}>Bearbeiten</Button>
+          <Button icon={Copy} variant="ghost" onClick={() => go("plan_edit", { from: { kind: "session", id: sess.id } })}>Duplizieren</Button>
+        </div>
 
-        <Section title="Notiz">
-          {sess.note ? <p className="prose">{sess.note}</p> : <p className="text-3">Keine Notiz.</p>}
-        </Section>
+        {(sess.focus || (sess.tags ?? []).length > 0) && (
+          <Section title="Schwerpunkt">
+            {sess.focus && <p className="prose">{sess.focus}</p>}
+            <TagList tags={sess.tags} />
+          </Section>
+        )}
 
         {drills.length > 0 && (
-          <Section title="Übungen" hint={doneCount === drills.length ? "alle erledigt" : `${doneCount}/${drills.length} erledigt`}>
+          <Section title="Übungen" hint={doneCount === drills.length ? "alle erledigt" : `${doneCount} von ${drills.length} durchgeführt`}>
             <DrillList items={drills} onChange={setDrills} editable={false} />
           </Section>
         )}
+
+        <Section title={sess.focus || drills.length ? "Beobachtungen" : "Notiz"}>
+          {sess.note ? <p className="prose">{sess.note}</p> : <p className="text-3">Keine Notiz.</p>}
+        </Section>
 
         <Section title="Anwesenheit">
           {att.length === 0 ? <p className="text-3">Keine Anwesenheit erfasst.</p> : (

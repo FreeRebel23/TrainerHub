@@ -1,59 +1,78 @@
-import { useState } from "react";
-import { Users, FileText, ListChecks, Sun, CheckCheck, RotateCcw } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Users, FileText, Sun, CheckCheck, RotateCcw, Pencil, Tags, History } from "lucide-react";
 import { todayISO, fmtDateFull, getSchoolHoliday, getHoliday } from "../lib/dates.js";
 import { byId, calcFactor, getTeamPlayers, isPresent, uid } from "../lib/data.js";
 import { DURATIONS } from "../lib/constants.js";
 import {
-  Button, PageHeader, Section, EmptyState, Field, ChoiceChips, Notice, Meta,
+  sessionDraftFromPlan, planDefaults, normalizeTags, normalizeDrill, knownTags, content, drillMinutes,
+} from "../lib/training.js";
+import { draftKey, loadDraft, saveDraft, clearDraft } from "../lib/draft.js";
+import {
+  Button, IconButton, PageHeader, Section, EmptyState, Field, ChoiceChips, Notice, Meta,
 } from "../components/ui.jsx";
-import { AttendanceList, DrillList } from "../components/training.jsx";
+import { AttendanceList, DrillList, TagPicker, TagList } from "../components/training.jsx";
 
 const fmtFactor = f => String(f).replace(".", ",");
+const defaultAtt = players => players.map(p => ({ playerId: p.id, status: p.injured ? "injured_absent" : "absent" }));
 
-// Erfassen in zwei Schritten: 1) Rahmen (vorbelegt aus Planung/Kontext), 2) Anwesenheit.
-// Der Schritt liegt in der Navigation (params.step), damit Zurück/Wischgeste im
-// Schritt 2 zum Schritt 1 führt statt die Eingaben zu verwerfen.
+function initialForm(data, params, plan) {
+  if (plan) return { ...sessionDraftFromPlan(plan), note: "" };
+  const date = params.date ?? todayISO();
+  const d = planDefaults(data, { date });
+  return { date, time: "", ...d, focus: "", tags: [], checklist: [], note: "", planId: null };
+}
+
+// Training durchführen bzw. erfassen.
+//  – aus einer Planung: direkt zur Anwesenheit, vorbereiteter Schwerpunkt und Übungen sind da
+//  – ohne Planung: 1) Rahmen, 2) Anwesenheit
+// Der Schritt liegt in der Navigation (params.step), params.steps zählt die Einträge des Ablaufs.
+// Ein Entwurf wird laufend gesichert, damit ein Beenden der PWA in der Halle nichts verliert.
 export function NewSessionView({ data, onSave, back, go, params }) {
-  const plan = params?.plan;
-  const step = params?.step === 2 ? 2 : 1;
+  const plan = params.planId ? byId(data.plannedSessions, params.planId) : params.plan ?? null;
+  const step = params.step === 2 ? 2 : 1;
   const teams  = data.teams ?? [];
   const types  = data.trainingTypes ?? [];
   const venues = data.venues ?? [];
 
-  const [date, setDate]       = useState(plan?.date ?? params?.date ?? todayISO());
-  const [teamId, setTeam]     = useState(plan?.teamId ?? teams[0]?.id ?? "");
-  const [typeId, setType]     = useState(plan?.trainingTypeId ?? types[0]?.id ?? "");
-  const [dur, setDur]         = useState(plan?.durationMinutes ?? types[0]?.duration ?? 90);
-  const [venueId, setVenueId] = useState(plan?.venueId ?? venues[0]?.id ?? "");
+  const [key] = useState(() => draftKey({ planId: plan?.id, date: params.date ?? todayISO() }));
+  const [restored] = useState(() => loadDraft(key));
+  const [form, setForm] = useState(() => restored?.form ?? initialForm(data, params, plan));
+  const [att, setAtt] = useState(() => restored?.att ?? (step === 2 ? defaultAtt(getTeamPlayers(form.teamId, data)) : null));
+  const [showRestored, setShowRestored] = useState(!!restored);
+  const [showNote, setShowNote] = useState(() => !!form.note);
+  const [editFocus, setEditFocus] = useState(false);
+  const [editTags, setEditTags] = useState(false);
+  const set = patch => setForm(f => ({ ...f, ...patch }));
 
-  // Schritt 2 — Zustand bleibt beim Zurückspringen erhalten
-  const [att, setAtt]           = useState(null);
-  const [note, setNote]         = useState("");
-  const [showNote, setShowNote] = useState(false);
-  const [drills, setDrills]     = useState([]);
-  const [showDrills, setShowDrills] = useState(false);
-
-  const team  = byId(teams, teamId);
-  const type  = byId(types, typeId);
-  const venue = byId(venues, venueId);
-  const players = getTeamPlayers(teamId, data);
+  const team  = byId(teams, form.teamId);
+  const type  = byId(types, form.trainingTypeId);
+  const venue = byId(venues, form.venueId);
+  const players = getTeamPlayers(form.teamId, data);
   const playerMap = Object.fromEntries(players.map(p => [p.id, p]));
 
-  function pickType(id) {
-    setType(id);
-    const t = byId(types, id);
-    if (t) setDur(t.duration);
+  // Entwurf sichern, sobald die Anwesenheit läuft
+  useEffect(() => { if (att) saveDraft(key, { form, att }); }, [key, form, att]);
+
+  function discardDraft() {
+    clearDraft();
+    setForm(initialForm(data, params, plan));
+    setAtt(step === 2 ? defaultAtt(getTeamPlayers(plan?.teamId ?? form.teamId, data)) : null);
+    setShowRestored(false);
   }
 
-  function pickTeam(id) { setTeam(id); setAtt(null); }
+  function pickType(id) {
+    const t = byId(types, id);
+    set({ trainingTypeId: id, ...(t ? { durationMinutes: t.duration } : {}) });
+  }
+  function pickTeam(id) { set({ teamId: id }); setAtt(null); }
 
+  const steps = params.steps ?? 1;
   function toAttendance() {
     // Anwesenheit neu aufbauen, wenn das Team gewechselt wurde
-    if (!att || att.some(a => !playerMap[a.playerId]) || att.length !== players.length) {
-      setAtt(players.map(p => ({ playerId: p.id, status: p.injured ? "injured_absent" : "absent" })));
-    }
-    go("new_session", { ...params, step: 2 }, { replace: params?.step === 2 });
+    if (!att || att.some(a => !playerMap[a.playerId]) || att.length !== players.length) setAtt(defaultAtt(players));
+    go("new_session", { ...params, step: 2, steps: steps + 1 });
   }
+  const changeFrame = () => go("new_session", { ...params, step: 1, steps: steps + 1 });
 
   if (!teams.length) {
     return (
@@ -68,7 +87,14 @@ export function NewSessionView({ data, onSave, back, go, params }) {
     );
   }
 
-  // ─── Schritt 2: Anwesenheit ───
+  const restoredNotice = showRestored && (
+    <Notice tone="info" icon={History}>
+      Dein begonnenes Training wurde wiederhergestellt.{" "}
+      <button type="button" className="link-btn" onClick={discardDraft}>Verwerfen und neu beginnen</button>
+    </Notice>
+  );
+
+  // ─── Schritt 2: Durchführen / Anwesenheit ───
   if (step === 2 && att) {
     const presentCount = att.filter(a => isPresent(a.status)).length;
     const commitCount  = att.filter(a => a.status === "injured_present").length;
@@ -78,27 +104,52 @@ export function NewSessionView({ data, onSave, back, go, params }) {
       return isPresent(a.status) ? a : { ...a, status: p?.injured ? "injured_present" : "present" };
     }));
     const reset = () => setAtt(prev => prev.map(a => ({ ...a, status: playerMap[a.playerId]?.injured ? "injured_absent" : "absent" })));
+    const done = form.checklist.filter(d => d.done).length;
+    const prepNote = plan ? content(plan).note : "";
 
     function save() {
       onSave({
-        id: uid(), teamId: team.id, trainingTypeId: type?.id ?? typeId,
-        date, durationMinutes: dur, factor: calcFactor(dur),
-        attendance: att, note: note.trim(),
-        venueId: venue?.id ?? null,
-        checklist: drills,
+        id: uid(), teamId: form.teamId, trainingTypeId: form.trainingTypeId,
+        date: form.date, durationMinutes: form.durationMinutes, factor: calcFactor(form.durationMinutes),
+        attendance: att, note: form.note.trim(),
+        venueId: form.venueId ?? null,
+        checklist: form.checklist.map(normalizeDrill).filter(d => d.text),
+        ...(form.time ? { time: form.time } : {}),
+        ...(form.focus.trim() ? { focus: form.focus.trim() } : {}),
+        ...(form.tags.length ? { tags: normalizeTags(form.tags) } : {}),
+        ...(plan ? { planId: plan.id } : {}),
       }, plan?.id);
+      clearDraft();
     }
 
     return (
       <div className="page">
-        <PageHeader title="Anwesenheit" back={back} />
+        <PageHeader title={plan ? "Training" : "Anwesenheit"} back={back} />
         <div className="page-body">
+          {restoredNotice}
           <div className="detail-head">
-            <p className="detail-head__eyebrow">{date === todayISO() ? "Heute" : fmtDateFull(date)}</p>
-            <p className="detail-head__meta">
-              <Meta items={[type?.name, team?.name, `${dur} min`, venue?.name]} />
-            </p>
+            <p className="detail-head__eyebrow">{form.date === todayISO() ? "Heute" : fmtDateFull(form.date)}{form.time && ` · ${form.time} Uhr`}</p>
+            <h2 className="detail-head__title">{type?.name ?? "Training"}</h2>
+            <p className="detail-head__meta"><Meta items={[team?.name, venue?.name, `${form.durationMinutes} min`]} /></p>
+            <button type="button" className="link-btn self-start" onClick={changeFrame}>Datum, Team oder Rahmen ändern</button>
           </div>
+
+          <Section title="Schwerpunkt" action={!editFocus && (
+            <IconButton icon={Pencil} size={16} label="Schwerpunkt ändern" onClick={() => setEditFocus(true)} />)}>
+            {editFocus || !form.focus ? (
+              <input className="input" aria-label="Schwerpunkt" value={form.focus} autoFocus={editFocus}
+                placeholder="Was trainiert ihr heute? (optional)" onChange={e => set({ focus: e.target.value })}
+                onBlur={() => setEditFocus(false)} enterKeyHint="done" />
+            ) : <p className="focus-line">{form.focus}</p>}
+            {editTags
+              ? <TagPicker value={form.tags} onChange={tags => set({ tags })} options={knownTags(data)} />
+              : <div className="disclosure">
+                  <TagList tags={form.tags} />
+                  <button type="button" className="link-btn" onClick={() => setEditTags(true)}>
+                    <Tags size={14} aria-hidden="true" /> {form.tags.length ? "Themen ändern" : "Themen wählen"}
+                  </button>
+                </div>}
+          </Section>
 
           <Section>
             <div className="att-toolbar">
@@ -114,64 +165,64 @@ export function NewSessionView({ data, onSave, back, go, params }) {
               <AttendanceList rows={att} getPlayer={pid => playerMap[pid]} onChange={setStatus} />
             )}
             <p className="field__hint">Antippen = dabei / nicht dabei. Über den Pfeil weitere Status wählen.</p>
-            {commitCount > 0 && (
-              <p className="status tone-warning">{commitCount} trotz Verletzung dabei</p>
+            {commitCount > 0 && <p className="status tone-warning">{commitCount} trotz Verletzung dabei</p>}
+          </Section>
+
+          <Section title="Übungen" hint={form.checklist.length ? `${done}/${form.checklist.length} erledigt` : undefined}>
+            {prepNote && <Notice tone="info" icon={FileText}>{prepNote}</Notice>}
+            <DrillList items={form.checklist} onChange={checklist => set({ checklist })} editable={false} addable />
+            {form.checklist.length > 0 && (
+              <p className="field__hint">Abhaken, was ihr gemacht habt. Nicht Abgehaktes gilt als ausgelassen.
+                {drillMinutes(form.checklist) > 0 && ` Geplant: ${drillMinutes(form.checklist)} min.`}</p>
             )}
           </Section>
 
-          <Section title="Notiz">
-            {showNote || note ? (
-              <textarea className="textarea expand" aria-label="Trainingsnotiz" value={note} onChange={e => setNote(e.target.value)}
-                placeholder="Schwerpunkt, Beobachtungen – z. B. Pick & Roll verteidigen, gute Intensität" rows={3} autoFocus={showNote && !note} />
+          <Section title="Beobachtungen">
+            {showNote || form.note ? (
+              <textarea className="textarea expand" aria-label="Beobachtungen und Notizen" value={form.note}
+                onChange={e => set({ note: e.target.value })} rows={3} autoFocus={showNote && !form.note}
+                placeholder="Was lief gut, was nicht? Auffälligkeiten einzelner Spieler:innen …" />
             ) : (
               <Button variant="secondary" icon={FileText} onClick={() => setShowNote(true)} className="self-start">
                 Notiz hinzufügen
               </Button>
             )}
           </Section>
-
-          <Section title="Übungen" hint={drills.length ? `${drills.filter(d => d.done).length}/${drills.length} erledigt` : undefined}>
-            {showDrills || drills.length ? (
-              <DrillList items={drills} onChange={setDrills} autoFocus={showDrills && drills.length === 0} />
-            ) : (
-              <Button variant="secondary" icon={ListChecks} onClick={() => setShowDrills(true)} className="self-start">
-                Übungen hinzufügen
-              </Button>
-            )}
-          </Section>
         </div>
         <div className="action-bar">
-          <Button variant="primary" size="lg" onClick={save}>Training speichern</Button>
+          <Button variant="primary" size="lg" onClick={save}>Training abschließen</Button>
         </div>
       </div>
     );
   }
 
   // ─── Schritt 1: Rahmen ───
-  const schoolHol = getSchoolHoliday(date);
-  const holiday   = getHoliday(date);
-  const dateInvalid = !date;
+  const schoolHol = getSchoolHoliday(form.date);
+  const holiday   = getHoliday(form.date);
+  const dateInvalid = !form.date;
 
   return (
     <div className="page">
-      <PageHeader title={plan ? "Geplantes Training erfassen" : "Training erfassen"} back={back} />
+      <PageHeader title={plan ? "Rahmen anpassen" : "Training erfassen"} back={back} />
       <div className="page-body">
+        {restoredNotice}
         <div className="form">
           <div className="field-grid">
             <Field label="Datum" htmlFor="ns-date" error={dateInvalid ? "Bitte ein Datum wählen." : null}>
-              <input id="ns-date" className="input" type="date" value={date} max={todayISO()}
-                aria-invalid={dateInvalid} onChange={e => setDate(e.target.value)} />
+              <input id="ns-date" className="input" type="date" value={form.date} max={todayISO()}
+                aria-invalid={dateInvalid} onChange={e => set({ date: e.target.value })} />
             </Field>
-            {teams.length > 1 ? (
-              <Field label="Team" htmlFor="ns-team">
-                <select id="ns-team" className="select" value={teamId} onChange={e => pickTeam(e.target.value)}>
-                  {teams.map(t => <option key={t.id} value={t.id}>{t.name} ({t.playerIds?.length ?? 0})</option>)}
-                </select>
-              </Field>
-            ) : (
-              <Field label="Team"><p className="input input--static">{team?.name}</p></Field>
-            )}
+            <Field label="Uhrzeit" htmlFor="ns-time" aside="optional">
+              <input id="ns-time" className="input" type="time" value={form.time} step={300}
+                onChange={e => set({ time: e.target.value })} />
+            </Field>
           </div>
+          {teams.length > 1 ? (
+            <Field label="Team">
+              <ChoiceChips label="Team" value={form.teamId} onChange={pickTeam}
+                options={teams.map(t => ({ value: t.id, label: t.name, meta: t.playerIds?.length ?? 0 }))} />
+            </Field>
+          ) : null}
           {(schoolHol || holiday) && (
             <Notice tone={holiday ? "danger" : "warning"} icon={Sun}>
               {holiday ? `Feiertag: ${holiday}` : `${schoolHol.name} – Ferientraining`}
@@ -179,25 +230,25 @@ export function NewSessionView({ data, onSave, back, go, params }) {
           )}
 
           <Field label="Trainingsart">
-            <ChoiceChips label="Trainingsart" value={typeId} onChange={pickType}
+            <ChoiceChips label="Trainingsart" value={form.trainingTypeId} onChange={pickType}
               options={types.map(t => ({ value: t.id, label: t.name }))} />
           </Field>
 
-          <Field label="Dauer" aside={`Faktor ${fmtFactor(calcFactor(dur))}`}>
-            <ChoiceChips label="Dauer" value={dur} onChange={setDur}
-              options={[...new Set([...DURATIONS, dur])].sort((a, b) => a - b).map(m => ({ value: m, label: `${m} min` }))} />
+          <Field label="Dauer" aside={`Faktor ${fmtFactor(calcFactor(form.durationMinutes))}`}>
+            <ChoiceChips label="Dauer" value={form.durationMinutes} onChange={v => set({ durationMinutes: v })}
+              options={[...new Set([...DURATIONS, form.durationMinutes])].sort((a, b) => a - b).map(m => ({ value: m, label: `${m} min` }))} />
           </Field>
 
           {venues.length > 0 && (
             <Field label="Halle">
-              <ChoiceChips label="Halle" value={venueId} onChange={setVenueId}
+              <ChoiceChips label="Halle" value={form.venueId} onChange={v => set({ venueId: v })}
                 options={venues.map(v => ({ value: v.id, label: v.name }))} />
             </Field>
           )}
         </div>
       </div>
       <div className="action-bar">
-        <Button variant="primary" size="lg" disabled={dateInvalid || !typeId} onClick={toAttendance}>
+        <Button variant="primary" size="lg" disabled={dateInvalid || !form.trainingTypeId} onClick={toAttendance}>
           Weiter zur Anwesenheit
         </Button>
       </div>
