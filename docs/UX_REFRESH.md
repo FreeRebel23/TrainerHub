@@ -59,7 +59,7 @@ Stand: 24.09.2026, Branch `trainerhub-next`. Ausgangslage siehe
 echten Schritt zurück oder, ohne Verlauf, zur Elternansicht. `finishFlow()` verlässt nach dem
 Speichern die Schritte des Assistenten.
 
-Fokusansichten (`new_session`, `new_season`, `jahrgang_upgrade`) blenden die Tab-Leiste aus.
+Fokusansichten (`new_session`, `new_season`, `jahrgang_upgrade`, Bearbeiten einer Einheit) blenden die Tab-Leiste aus.
 Die Aktionsleiste sitzt dort immer unten.
 
 ## Theme-System
@@ -85,13 +85,14 @@ Die Aktionsleiste sitzt dort immer unten.
 `src/components/training.jsx`: `AttendanceList` und `DrillList` (Erfassen und Bearbeiten),
 `quickToggle` (Antippen-Logik inkl. Verletzten-Regel).
 `src/components/AppShell.jsx`: Sidebar, Tab-Leiste, Zuordnung Ansicht → Bereich.
+`src/components/confirm.jsx`: `ConfirmProvider`/`useConfirm()` – Bestätigungen im App-Design.
 
 Styling liegt ausschließlich in `src/styles/app.css`, ohne Inline-Styles. Einzige Ausnahme ist
 die dynamische Balkenbreite in der Auswertung.
 
 ## Responsive-Konzept
 
-- Mobile first, geprüft bei 320, 375, 768, 1280 px ohne horizontales Scrollen.
+- Mobile first, geprüft bei 320, 375, 393, 430, 768, 1280 px und quer (844 × 390) ohne horizontales Scrollen.
 - < 900 px: Tab-Leiste unten (Safe Area), Seitenränder 16 px bzw. 32 px ab 768 px.
 - ≥ 900 px: Sidebar 232 px, Inhalt auf 760 px Lesebreite zentriert (Kalender 1040 px).
 - Touch-Ziele mindestens 44 px, Eingaben 16 px (kein iOS-Zoom), Zoom wieder erlaubt.
@@ -106,30 +107,60 @@ die dynamische Balkenbreite in der Auswertung.
 - `xlsx`/`papaparse` werden bei Bedarf geladen: Haupt-Bundle 711 kB → 256 kB, weiterhin
   im Precache (offline nutzbar).
 - Druckansichten maskieren Nutzereingaben (Schutz bei importierten Sync-Dateien).
-- ESLint (`npm run lint`) und Vitest (`npm test`, 19 Tests für Datum, Migration, Ranking,
-  Planimport, Sync, Anwesenheitslogik). `npm run check` führt beides plus Build aus.
+- ESLint (`npm run lint`) und Vitest (`npm test`, 22 Tests für Datum, Migration, Ranking,
+  Planimport, Sync, Anwesenheitslogik und Navigation). `npm run check` führt beides plus Build aus.
 - PWA: Manifest-Farben neutral, `theme-color` folgt dem Theme, iOS-Statusleiste `default`
   (vorher lag der Header unter der Statusleiste), neue Icons (weißes „TH“ auf Teal).
 - Unverändert: Datenformat, Storage-Key `trainerhub_v1`, Migrationen, Sync-/Backup-Format,
   Update-Mechanismus (`usePwaUpdate`), Deployment-Workflow.
 
-## Bekannte offene UX-Punkte
+## Abnahme & Polish (Release-Runde)
 
-- **Statusleiste iOS:** `apple-mobile-web-app-status-bar-style` wird nur beim Installieren
-  gelesen. Wählt man in der App ein anderes Theme als das System, passt die Statusleiste nicht
-  zum App-Hintergrund.
-- **Icon-Wechsel:** Bereits installierte iOS-Apps behalten ihr altes Icon bis zur Neuinstallation.
-- **Kein „Schwerpunkt“-Feld:** Der Schwerpunkt einer Einheit steckt heute in der freien Notiz.
-  Ein eigenes Feld (oder Tags) würde Suche und Saisonübersicht deutlich verbessern.
-- **Geplante Trainings** lassen sich nicht bearbeiten (nur löschen/neu anlegen) und haben keine
-  Uhrzeit.
-- **Spieler:innen** lassen sich nicht umbenennen oder global löschen (war vorher auch nicht möglich).
-- **Bestätigungen** nutzen `window.confirm`. Das ist funktional, aber optisch nicht im Design.
-  Eine kleine Rückgängig-Meldung wäre angenehmer.
-- **`xlsx@0.18.5`** hat eine bekannte ReDoS-Lücke ohne npm-Fix (betrifft nur selbst gewählte
-  Importdateien). Ein Wechsel auf das SheetJS-CDN-Paket oder eine CSV-only-Lösung ist sinnvoll.
-- **Orientierung** im Manifest bleibt `portrait` (bisheriges Verhalten). Für Tablets wäre `any`
-  denkbar.
+Technische Abnahme vor dem Merge. Die Beobachtungen aus der Geräte-Nutzung stehen noch aus
+und werden ergänzt.
+
+| Kat. | Befund | Lösung |
+| --- | --- | --- |
+| A | Zwei heute geplante Trainings (z. B. zwei Teams): das zweite fehlte auf Start komplett | weitere heutige Planungen stehen unter „Als Nächstes“ mit „Erfassen“ |
+| A | Zurück aus einer Einheit ins Trainingsbuch: Suche/Teamfilter weg, Scrollposition passte nicht mehr zur Liste | Suche/Filter im Navigationszustand; Scrollposition wird pro Ebene gespeichert und nach dem Rendern wiederhergestellt (`history.scrollRestoration = "manual"`) |
+| A | Beim Bearbeiten einer Einheit war die Tab-Leiste aktiv: ein Tipp verwarf Änderungen still | Bearbeiten ist eine eigene Navigationsebene ohne Tab-Leiste; Zurück/Wischgeste = Abbrechen |
+| B | Native `confirm()`-Dialoge zeigen in der PWA die Domain als Titel | eigener Bestätigungsdialog auf Basis von `<dialog>` (mobil als Sheet im Daumenbereich, Fokus auf „Abbrechen“, Escape/Hintergrund schließt), keine neue Abhängigkeit |
+| B | Hover-Zustände blieben auf iOS nach dem Antippen „kleben“, grauer Tap-Blitz | Hover nur bei `(hover: hover)`, Touch-Feedback über `:active`, Tap-Highlight aus |
+| B | Tastaturfokus in Listen durch `overflow: hidden` abgeschnitten | Fokusrahmen innerhalb von Listen nach innen versetzt |
+| B | Fokussierte Felder konnten unter Sticky-Kopf/Speichern-Leiste landen (virtuelle Tastatur) | `scroll-padding-top/bottom` am Dokument |
+| B | 320 px: lange Hallennamen und die Zeile „Version“ abgeschnitten | Umbruch in Zeilentiteln, kürzerer Button „Prüfen“ (Label bleibt „Nach Updates suchen“) |
+| B | Update-Hinweis lag in Fokusansichten über der Speichern-Leiste | dort oberhalb der Leiste positioniert |
+
+Geprüft: 320 · 375 · 393 · 430 · 768 · 1280 px und Smartphone quer (844 × 390), Light und Dark,
+alle 16 Ansichten ohne horizontalen Überlauf oder abgeschnittene Bedienelemente; Kernflows
+Erfassen, Trainingsbuch, Bearbeiten, Löschen, Team, Theme; Production-Build mit Update-Hinweis →
+Aktualisieren und Offline-Reload bei gestopptem Server.
+
+## Bekannte offene UX-Punkte (neu bewertet)
+
+- **Statusleiste iOS** (kein Merge-Blocker): `apple-mobile-web-app-status-bar-style` wird nur
+  bei der Installation gelesen. Weicht das App-Theme vom System ab, passt die Leiste nicht.
+  Eine saubere Lösung (Inhalt unter einer transparenten Leiste) bräuchte die Rückkehr zu
+  `black-translucent` mit durchgängigem Safe-Area-Handling. Das ist erst nach Tests auf einem
+  echten Gerät sinnvoll.
+- **Icon bei installierter PWA** (kein Blocker): iOS behält das alte Icon bis zur Neuinstallation.
+- **`xlsx@0.18.5` ReDoS** (kein Blocker): betrifft nur selbst gewählte Importdateien. Später auf das
+  offizielle SheetJS-Paket (CDN-Tarball) wechseln oder den Excel-Import auf CSV beschränken.
+- **Verlust beim Zurück aus Schritt 1 des Erfassens:** Wer Anwesenheit erfasst, zu Schritt 1
+  zurückgeht und dann den Assistenten verlässt, verliert die Eingaben. Das ist selten und
+  bewusst ohne Nachfrage belassen.
+- **Orientierung** im Manifest bleibt `portrait` (bisheriges Verhalten).
+
+## Backlog Phase 2+ (bewusst nicht umgesetzt)
+
+- Schwerpunkt-Feld bzw. Tags je Einheit (Suche, Saisonübersicht)
+- Geplante Trainings bearbeiten, Uhrzeit, vorbereitete Übungen
+- Einheit als Vorlage duplizieren, Übungsbibliothek
+- Saisonübersicht nach Trainingsinhalten
+- Monatsangabe im Datumsblock bei Terminen im Folgemonat (Start „Als Nächstes“)
+- Rückgängig-Meldung statt Bestätigung bei weniger kritischen Aktionen
+- CI: Lint/Tests vor dem Deploy in `.github/workflows/deploy.yml`
+- Sync (PocketBase), Konten, Rollen, GameDay/Scoreboard, ArcShot, KI
 
 ## Sinnvolle nächste Schritte
 
