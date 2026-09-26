@@ -1,4 +1,4 @@
-import { useData } from "./lib/data.js";
+import { useAppData } from "./sync/useSyncedData.js";
 import { recordSession, removeSession } from "./lib/training.js";
 import { useNav } from "./lib/nav.js";
 import { useTheme } from "./lib/theme.js";
@@ -17,13 +17,15 @@ import { StatsView } from "./views/Stats.jsx";
 import { SettingsView } from "./views/Settings.jsx";
 import { PlanEditView } from "./views/PlanEdit.jsx";
 import { PlanDetailView } from "./views/PlanDetail.jsx";
+import { LoginView, MigrationView } from "./views/Account.jsx";
+import { SyncNotice } from "./components/SyncStatus.jsx";
 
 // Fokus-Ansichten blenden die mobile Tab-Leiste aus (Daumenbereich gehört der Aktion)
 const FOCUS_VIEWS = new Set(["new_session", "plan_edit", "new_season", "jahrgang_upgrade"]);
 const KEEP_STATE  = new Set(["new_session", "training"]);
 
 export default function App() {
-  const { data, update } = useData();
+  const { data, update, sync } = useAppData();
   const { nav, go, back, finishFlow } = useNav();
   const theme = useTheme();
   const pwa   = usePwaUpdate();
@@ -60,13 +62,18 @@ export default function App() {
     case "season_detail":  page = <SeasonDetailView {...common} seasonId={p.seasonId} back={() => back("season_list", { teamId: p.teamId })} />; break;
     case "jahrgang_upgrade": page = <JahrgangUpgradeView {...common} seasonId={p.seasonId} back={() => back("season_detail", { seasonId: p.seasonId, teamId: p.teamId })} />; break;
     case "stats":          page = <StatsView data={data} />; break;
-    case "settings":       page = <SettingsView data={data} update={update} pwa={pwa} theme={theme} />; break;
+    case "settings":       page = <SettingsView data={data} update={update} pwa={pwa} theme={theme} sync={sync} />; break;
     default:               page = <HomeView {...common} />;
   }
 
+  // Servermodus: Anmeldung bzw. Erstübernahme vor der eigentlichen App
+  if (sync.mode === "login" || (sync.mode === "ready" && sync.reloginOpen)) return <ConfirmProvider><LoginView sync={sync} /></ConfirmProvider>;
+  if (sync.mode === "migrate") return <ConfirmProvider><MigrationView sync={sync} /></ConfirmProvider>;
+
   return (
     <ConfirmProvider>
-    <AppShell view={v} go={go} theme={theme} focus={FOCUS_VIEWS.has(v) || (v === "session_detail" && !!p.edit)}>
+    <AppShell view={v} go={go} theme={theme} club={clubLabel(data, sync.meta.sectionId)} focus={FOCUS_VIEWS.has(v) || (v === "session_detail" && !!p.edit)}>
+      <SyncNotice sync={sync} go={go} />
       {/* key: Wechsel zu einem anderen Datensatz setzt lokalen Zustand zurück. Assistent-Schritte
           und Ansichtsmodi des Trainingsbuchs behalten ihn. */}
       <div key={KEEP_STATE.has(v) ? v : v + JSON.stringify(p)}>{page}</div>
@@ -79,4 +86,11 @@ export default function App() {
     </AppShell>
     </ConfirmProvider>
   );
+}
+
+// Verein/Abteilung aus dem Konto; ohne Server die bisherige Bezeichnung
+function clubLabel(data, sectionId) {
+  const section = (data.sections ?? []).find(x => x.id === sectionId);
+  const org = section && (data.organizations ?? []).find(o => o.id === section.organizationId);
+  return org ? [org.name, section.name].join(" ") : "TV Bretten Basketball";
 }

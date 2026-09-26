@@ -1,0 +1,10 @@
+node_modules
+dist
+dev-dist
+.cache
+.git
+**/pb_data
+deploy/data
+deploy/backups
+deploy/.env
+.env

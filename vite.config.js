@@ -39,7 +39,10 @@ export default defineConfig({
       },
       workbox: {
         // Alles cachen — App läuft komplett offline
-        globPatterns: ["**/*.{js,css,html,svg,png,woff2}"]
+        globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
+        // Servermodus (Phase 3): API und PocketBase-Admin nie aus dem App-Cache beantworten.
+        // API-Aufrufe selbst sind fetch()-Requests und werden nicht gecacht (kein runtimeCaching).
+        navigateFallbackDenylist: [/^\/api\//, /^\/_\//]
       }
     })
   ]

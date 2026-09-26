@@ -1,0 +1,58 @@
+# TrainerHub als eigenständiger, isolierter Compose-Stack (Staging bzw. später Produktion).
+#
+#   cd deploy && cp .env.example .env   # Werte anpassen, siehe docs/HETZNER_DEPLOYMENT_HANDOFF.md
+#   docker compose up -d --build
+#
+# Nach außen gibt es genau einen HTTP-Eingang (web). TLS, Domain und Zertifikat liefert der
+# vorhandene Reverse Proxy des Servers. Der Stack bringt keinen eigenen öffentlichen Proxy mit.
+
+name: ${COMPOSE_PROJECT_NAME:-trainerhub-staging}
+
+services:
+  pocketbase:
+    build:
+      context: ..
+      dockerfile: pocketbase/Dockerfile
+    image: trainerhub-pocketbase:${TRAINERHUB_IMAGE_TAG:-local}
+    restart: unless-stopped
+    command:
+      - serve
+      - --http=0.0.0.0:8090
+      - --dir=/pb/pb_data
+      - --migrationsDir=/pb/pb_migrations
+      - --hooksDir=/pb/pb_hooks
+      - --hooksWatch=false
+      - --origins=${TRAINERHUB_PUBLIC_URL:?TRAINERHUB_PUBLIC_URL fehlt}
+      - --encryptionEnv=PB_ENCRYPTION_KEY
+    environment:
+      PB_ENCRYPTION_KEY: ${PB_ENCRYPTION_KEY:?PB_ENCRYPTION_KEY fehlt (32 Zeichen)}
+    volumes:
+      # Persistente Daten (Datenbank, Backups, spätere Upload-Dateien) – außerhalb des Containers
+      - ${PB_DATA_DIR:-./data/pb_data}:/pb/pb_data
+    ports:
+      # Nur für das PocketBase-Dashboard per SSH-Tunnel; niemals öffentlich binden
+      - "${PB_ADMIN_BIND:-127.0.0.1:18091}:8090"
+    networks: [internal]
+    logging: &logging
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/web/Dockerfile
+      args:
+        VITE_SYNC_SERVER: same-origin
+    image: trainerhub-web:${TRAINERHUB_IMAGE_TAG:-local}
+    restart: unless-stopped
+    depends_on:
+      pocketbase: { condition: service_healthy }
+    ports:
+      # Upstream für den vorhandenen Reverse Proxy. Standard: nur lokal erreichbar.
+      - "${WEB_BIND:-127.0.0.1:18090}:8080"
+    networks: [internal]
+    logging: *logging
+
+networks:
+  internal:
+    name: ${COMPOSE_PROJECT_NAME:-trainerhub-staging}_internal

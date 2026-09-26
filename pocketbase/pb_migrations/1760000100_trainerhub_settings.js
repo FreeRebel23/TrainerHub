@@ -13,7 +13,7 @@ migrate((app) => {
 
   const settings = app.settings();
   settings.meta.appName = "TrainerHub";
-  settings.backups.cron = "30 3 * * *";    // täglich 03:30 (Serverzeit) nach pb_data/backups
+  settings.backups.cron = "30 2 * * *";    // täglich 02:30 UTC (Container ohne Zeitzonendaten) nach pb_data/backups
   settings.backups.cronMaxKeep = 14;
   settings.trustedProxy.headers = ["X-Real-IP"];
   settings.rateLimits.enabled = true;
@@ -22,8 +22,6 @@ migrate((app) => {
     { label: "/api/", maxRequests: 1000, duration: 10 },
   ];
   app.save(settings);
-}, (app) => {
-  const users = app.findCollectionByNameOrId("users");
-  users.createRule = "";
-  app.save(users);
+}, () => {
+  // Kein Rückbau: Selbstregistrierung oder offene Regeln sollen nie versehentlich entstehen
 });

@@ -13,6 +13,7 @@ import {
   Button, IconButton, PageIntro, Section, Row, Meta, Field, ChoiceChips, Segmented, Notice,
 } from "../components/ui.jsx";
 import { useConfirm } from "../components/confirm.jsx";
+import { SyncSection } from "../components/SyncStatus.jsx";
 
 // Datei-Eingabe als Listenzeile (Label umschließt das versteckte input)
 function FileRow({ icon: Icon, title, meta, accept, onFile }) {
@@ -80,7 +81,8 @@ function VenueForm({ val, onChange, onSave, onCancel, submitLabel }) {
   );
 }
 
-export function SettingsView({ data, update, pwa, theme }) {
+export function SettingsView({ data, update, pwa, theme, sync }) {
+  const server = sync?.mode === "ready";
   const teams = data.teams ?? [];
   // Trainingsarten
   const [typeEdit, setTypeEdit]   = useState(null);   // id | "new" | null
@@ -137,6 +139,13 @@ export function SettingsView({ data, update, pwa, theme }) {
     <div className="page">
       <PageIntro title="Einstellungen" />
       <div className="page-body">
+        {server && <SyncSection sync={sync} />}
+        {sync?.mode === "local" && sync.client && (
+          <Section title="Konto">
+            <p className="field__hint">Du arbeitest ohne Anmeldung nur auf diesem Gerät.</p>
+            <Button className="self-start" onClick={() => sync.leaveLocal()}>Anmelden und Daten übernehmen</Button>
+          </Section>
+        )}
 
         <Section title="Darstellung">
           <Segmented label="Farbschema" block value={theme.pref} onChange={theme.setPref} options={[
@@ -210,7 +219,8 @@ export function SettingsView({ data, update, pwa, theme }) {
             : <Button icon={Plus} className="self-start" onClick={() => { setVenueEdit("new"); setVenueDraft({ name: "", address: "" }); }}>Halle</Button>}
         </Section>
 
-        <Section title="Mit anderen Trainer:innen abgleichen">
+        <Section title={server ? "Datei-Abgleich (alt)" : "Mit anderen Trainer:innen abgleichen"}>
+          {server && <p className="field__hint">Übergangslösung aus Phase 2, bis der Server-Sync überall im Einsatz ist. Mit Konto werden Trainings automatisch geteilt.</p>}
           <p className="field__hint">
             Jede:r arbeitet in der eigenen App. Zum Abgleich die Sync-Datei senden (z. B. per WhatsApp);
             die andere Person importiert sie über „Sync empfangen“. Nur neue Trainings werden übernommen.
@@ -293,14 +303,25 @@ export function SettingsView({ data, update, pwa, theme }) {
         </Section>
 
         <Section title="Datensicherung" hint={<Meta items={[`${teams.length} Teams`, `${(data.players ?? []).length} Spieler:innen`, `${data.sessions?.length ?? 0} Trainings`]} />}>
-          <p className="field__hint">Alle Daten liegen nur auf diesem Gerät. Sichere sie regelmäßig.</p>
+          <p className="field__hint">{server
+            ? "Deine Daten liegen im Konto und auf diesem Gerät. Ein Backup ist eine zusätzliche Kopie."
+            : "Alle Daten liegen nur auf diesem Gerät. Sichere sie regelmäßig."}</p>
           <div className="list">
             <Row lead={<HardDriveDownload size={20} aria-hidden="true" />}
               title="Backup herunterladen" meta="Alle Daten als JSON-Datei"
               onClick={() => downloadBackup(data)} />
-            <FileRow icon={HardDriveUpload} title="Backup wiederherstellen" meta="Ersetzt alle Daten auf diesem Gerät" accept=".json"
+            <FileRow icon={HardDriveUpload} title={server ? "Backup übernehmen" : "Backup wiederherstellen"}
+              meta={server ? "Ergänzt fehlende Einträge – überschreibt nichts im Konto" : "Ersetzt alle Daten auf diesem Gerät"} accept=".json"
               onFile={f => readBackup(f,
                 async imp => {
+                  if (server) {
+                    // Im Konto nie ersetzen (das würde auf allen Geräten löschen), sondern ergänzen
+                    try {
+                      const n = await sync.importBackup(imp);
+                      setBackupMsg({ ok: true, text: `Backup übernommen: ${n.sessions} Trainings, ${n.plans} Planungen geprüft – nur Fehlendes ergänzt.` });
+                    } catch (err) { setBackupMsg({ ok: false, text: err?.kind === "offline" ? "Dafür ist eine Verbindung zum Server nötig." : "Übernahme fehlgeschlagen: " + err.message }); }
+                    return;
+                  }
                   if (!(await confirm({ title: "Backup wiederherstellen?", confirmLabel: "Ersetzen", danger: true,
                     text: `Das Backup enthält ${imp.sessions.length} Trainings. Alle aktuellen Daten auf diesem Gerät werden ersetzt.` }))) return;
                   update(() => imp);

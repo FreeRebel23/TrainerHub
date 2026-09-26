@@ -1,0 +1,17 @@
+# Optionale Ergänzung, falls der vorhandene Reverse Proxy selbst als Container läuft und
+# Upstreams über ein gemeinsames Docker-Netzwerk erreicht (z. B. Traefik, Caddy, nginx-proxy).
+# Dann braucht web keinen Host-Port.
+#
+#   docker compose -f compose.yaml -f compose.proxy-network.yaml up -d
+#
+# PROXY_NETWORK = Name des bestehenden externen Netzwerks (wird NICHT angelegt oder verändert).
+# Labels bzw. Proxy-Konfiguration werden erst nach der Bestandsaufnahme ergänzt.
+services:
+  web:
+    ports: !reset []
+    networks: [internal, proxy]
+
+networks:
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:?PROXY_NETWORK fehlt}

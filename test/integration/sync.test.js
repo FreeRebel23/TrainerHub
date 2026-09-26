@@ -78,6 +78,11 @@ describe("Anmeldung und Erstübernahme", () => {
     expect(open).toMatchObject({ time: "18:30", focus: "Pressbreak", tags: ["Transition"], note: "Hütchen", recordedId: null });
     expect(open.checklist[0]).toMatchObject({ text: "3-gegen-2", minutes: 20, done: false });
     expect(d.seasons[0].gamedays[0].opponent).toBe("KIT");
+    // Standard-Trainingsarten/Hallen aus der Vereinseinrichtung werden nicht verdoppelt
+    const types = await pb.admin.list("training_types", `section = "${t.basketball.id}"`);
+    expect(types.map(x => x.name).sort()).toEqual(["Basketball", "Fitness", "Taktik", "Technik"]);
+    expect((await pb.admin.list("venues", `organization = "${t.orgA.id}"`))).toHaveLength(4);
+    expect(d.sessions.find(s => s.id === "mz1sess0001").trainingTypeId).toBe(types.find(x => x.name === "Basketball").id);
     expect(d.sessions.find(s => s.id === "mz1sess0001").erfasstVon).toBe("Florian");
     // Server-Sicht: Trainings gehören zum Team, Florian ist Trainer des neuen Teams
     const team = await pb.admin.call("GET", `/api/collections/teams/records/${u16.id}`);

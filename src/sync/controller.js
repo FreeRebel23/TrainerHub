@@ -11,7 +11,7 @@
 import { loadData, persist } from "../lib/data.js";
 import { clearDraft } from "../lib/draft.js";
 import { createClient, SyncError } from "./client.js";
-import { toServerSets, fromServerSets, fieldsToLocal, BY_NAME, PUSH_ORDER } from "./mapping.js";
+import { toServerSets, fromServerSets, fieldsToLocal, localToFields, BY_NAME, PUSH_ORDER } from "./mapping.js";
 import { pendingChanges, rebase } from "./engine.js";
 import { runSync, pullAll } from "./runner.js";
 import { loadMeta, saveMeta, loadBase, saveBase, clearSync, emptyMeta } from "./store.js";
@@ -99,6 +99,7 @@ export class SyncController {
     }
     if (!this.data.settings?.trainerName && user.name) this.data = { ...this.data, settings: { ...(this.data.settings ?? {}), trainerName: user.name } };
     this.status = { state: "idle", message: null };
+    this.reloginOpen = false;
     this.saveAll();
     this.emit();
     if (this.mode === "ready") await this.sync().catch(() => {});
@@ -129,16 +130,23 @@ export class SyncController {
   // Aus dem lokalen Modus heraus später anmelden
   leaveLocal() { this.meta = { ...this.meta, localOnly: false }; this.saveAll(); this.emit(); }
 
-  async logout({ force = false } = {}) {
+  // Abgelaufene Anmeldung erneuern, ohne die App zu verlassen (Daten bleiben)
+  openRelogin() { this.reloginOpen = true; this.emit(); }
+  cancelRelogin() { this.reloginOpen = false; this.emit(); }
+
+  // Abmelden entfernt die Daten des Kontos vom Gerät (geteilte Geräte). Ausstehende Änderungen
+  // verhindern das ohne force. keepLocal: Übernahme abgebrochen – bisheriger Gerätestand bleibt.
+  async logout({ force = false, keepLocal = false } = {}) {
     if (!force && this.pendingCount > 0) return { pending: this.pendingCount };
     clearTimeout(this.timer);
-    try { this.storage.removeItem("trainerhub_v1"); } catch { /* egal */ }
+    if (!keepLocal) try { this.storage.removeItem("trainerhub_v1"); } catch { /* egal */ }
     clearSync(this.storage);
     clearDraft(this.storage);
     this.client?.setToken(null);
     this.meta = emptyMeta();
     this.base = {};
-    this.data = { ...EMPTY_DATA() };
+    this.data = keepLocal ? loadData(this.storage) : { ...EMPTY_DATA() };
+    this.reloginOpen = false;
     this.pendingCount = 0;
     this.status = { state: "idle", message: null };
     this.emit();
@@ -174,7 +182,9 @@ export class SyncController {
     const keep = { settings: this.data.settings ?? {}, organizations: this.data.organizations, sections: this.data.sections };
     if (mode === "server") this.data = { ...EMPTY_DATA(), ...keep };
     else {
-      const prepared = prepareUpload(source, { userId: this.meta.user.id, server: mode === "merge" ? info.serverData : null });
+      // Stammdaten (Trainingsarten, Hallen, …) immer mit vorhandenen gleichnamigen zusammenführen –
+      // auch bei „leerem“ Konto hat die Vereinseinrichtung meist schon Standard-Trainingsarten angelegt
+      const prepared = prepareUpload(source, { userId: this.meta.user.id, server: info.serverData });
       this.data = { ...prepared.data, ...keep };
     }
     // Keine base: alles gilt als neu. Was es auf dem Server schon gibt, wird übernommen, nicht überschrieben.
@@ -264,10 +274,16 @@ export class SyncController {
     if (!c) return;
     this.meta = { ...this.meta, conflicts: this.meta.conflicts.filter((_, i) => i !== index) };
     saveMeta(this.meta, this.storage);
-    const record = c.localRecord ?? c.local;
-    if (choice === "mine" && record) {
-      const list = BY_NAME[c.coll].local;
-      const mine = fieldsToLocal(c.coll, c.id, c.kind === "field" ? { ...record } : record);
+    const list = BY_NAME[c.coll]?.local;
+    if (choice === "mine" && list && c.kind === "field") {
+      // Nur das kollidierte Feld zurücksetzen – andere, zusammengeführte Änderungen bleiben
+      this.update(d => ({ ...d, [list]: (d[list] ?? []).map(x => {
+        if (x.id !== c.id) return x;
+        const f = { ...localToFields(c.coll, x, this.ctx), [c.field]: c.local };
+        return fieldsToLocal(c.coll, c.id, f);
+      }) }));
+    } else if (choice === "mine" && list && c.local && c.kind !== "delete-rejected") {
+      const mine = fieldsToLocal(c.coll, c.id, c.local);
       this.update(d => ({ ...d, [list]: [...(d[list] ?? []).filter(x => x.id !== c.id), mine] }));
     } else this.emit();
   }
@@ -285,6 +301,14 @@ export class SyncController {
     });
     this.update(d => ({ ...d, ...Object.fromEntries(Object.entries(restore).map(([l, xs]) => [l, [...(d[l] ?? []), ...xs]])) }));
   }
+}
+
+// Anzeige-Sicht: Trainingsarten anderer Abteilungen ausblenden (z. B. für Vereins-Admins), sofern
+// sie nicht verwendet werden. Nur lesend – Änderungen laufen über update() auf dem vollen Stand.
+export function viewData(data, sectionId) {
+  if (!sectionId || !(data.trainingTypes ?? []).some(t => t.sectionId && t.sectionId !== sectionId)) return data;
+  const used = new Set([...(data.sessions ?? []), ...(data.plannedSessions ?? [])].map(x => x.trainingTypeId));
+  return { ...data, trainingTypes: data.trainingTypes.filter(t => !t.sectionId || t.sectionId === sectionId || used.has(t.id)) };
 }
 
 // Nur die Daten einer Abteilung (Teams, deren Spieler:innen, Trainings, Planungen, Saisons)

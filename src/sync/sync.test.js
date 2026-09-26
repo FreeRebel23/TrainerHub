@@ -207,3 +207,14 @@ describe("Lokaler Modus und Speicher", () => {
     expect(loadMeta(st).conflicts).toHaveLength(50);
   });
 });
+
+describe("Anzeige-Sicht", () => {
+  it("blendet ungenutzte Trainingsarten anderer Abteilungen aus, ohne Daten zu verändern", async () => {
+    const { viewData } = await import("./controller.js");
+    const data = { trainingTypes: [{ id: "a", sectionId: "bb" }, { id: "b", sectionId: "hb" }, { id: "c", sectionId: "hb" }, { id: "d" }],
+      sessions: [{ id: "s", trainingTypeId: "c" }], plannedSessions: [] };
+    expect(viewData(data, "bb").trainingTypes.map(t => t.id)).toEqual(["a", "c", "d"]);
+    expect(data.trainingTypes).toHaveLength(4);
+    expect(viewData(data, null)).toBe(data);
+  });
+});

@@ -716,3 +716,30 @@ button.row:active, .file-row:active, .chip:active:not([aria-pressed="true"]), .a
 .row-actions .btn { margin-right: auto; }
 .grow { flex: 1 1 auto; }
 .hero-focus { margin-top: var(--space-2); }
+
+/* ─── Anmeldung / Erstübernahme (Phase 3) ─── */
+
+.auth {
+  min-height: 100dvh;
+  display: flex; align-items: center; justify-content: center;
+  padding: max(var(--space-5), env(safe-area-inset-top)) var(--gutter, var(--space-4)) max(var(--space-5), env(safe-area-inset-bottom));
+  background: var(--bg);
+}
+.auth__card {
+  width: 100%; max-width: 380px;
+  display: flex; flex-direction: column; gap: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+.auth__card--wide { max-width: 520px; }
+.auth__brand { display: flex; align-items: center; gap: var(--space-3); }
+.auth__brand .brand-mark { width: 36px; height: 36px; font-size: 14px; }
+.auth__title { font-size: var(--text-xl, 20px); letter-spacing: -0.01em; }
+
+.sync-notice {
+  padding: var(--space-3) var(--gutter, var(--space-4)) 0;
+  padding-left: max(var(--gutter, var(--space-4)), env(safe-area-inset-left));
+  padding-right: max(var(--gutter, var(--space-4)), env(safe-area-inset-right));
+}

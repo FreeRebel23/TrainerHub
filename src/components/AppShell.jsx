@@ -21,7 +21,7 @@ const VIEW_TAB = {
 };
 export const tabOf = view => VIEW_TAB[view] ?? "home";
 
-export function AppShell({ view, go, theme, focus, children }) {
+export function AppShell({ view, go, theme, focus, club, children }) {
   const active = tabOf(view);
   const goTab = key => go(key, {}, { root: true });
   const current = key => (active === key ? "page" : undefined);
@@ -31,7 +31,7 @@ export function AppShell({ view, go, theme, focus, children }) {
       <aside className="sidebar" aria-label="Hauptnavigation">
         <div className="sidebar__brand">
           <span className="brand-mark" aria-hidden="true">TH</span>
-          <span>TrainerHub<span className="sidebar__club">TV Bretten Basketball</span></span>
+          <span>TrainerHub<span className="sidebar__club">{club}</span></span>
         </div>
         <nav className="sidebar__nav">
           {TABS.map(t => (

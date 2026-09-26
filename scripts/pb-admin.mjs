@@ -9,6 +9,7 @@
 //             legt Verein + Abteilung an (idempotent) und die Standard-Trainingsarten/-Hallen
 //   user      --email a@b.de --name "Florian" [--password …] [--org-admin] [--section-manager]
 //             legt ein Konto an bzw. ergänzt es und macht es zum Vereinsmitglied
+//   team      --section Basketball --name U14w [--org …] [--trainer a@b.de]   Team anlegen
 //   grant     --email a@b.de --team <team-id|Teamname>   Team-Zugriff geben
 //   revoke    --email a@b.de --team <team-id|Teamname>   Team-Zugriff entziehen
 //   overview  zeigt Vereine, Abteilungen, Teams und Zugriffe
@@ -72,6 +73,14 @@ export async function adminApi(url, email, password, fetchImpl = fetch) {
       }
       return { user: u, password: password ? null : generated };
     },
+    async createTeam({ section, name, org, trainer }) {
+      const o = org ? await find("organizations", `name = "${esc(org)}" || id = "${esc(org)}"`) : (await list("organizations"))[0];
+      const s = o && await find("sections", `organization = "${o.id}" && (name = "${esc(section)}" || id = "${esc(section)}")`);
+      if (!s) throw new Error("Abteilung nicht gefunden.");
+      const u = trainer ? await find("users", `email = "${esc(trainer)}"`) : null;
+      if (trainer && !u) throw new Error("Konto nicht gefunden.");
+      return create("teams", { section: s.id, name, trainers: u ? [u.id] : [] });
+    },
     async team(ref) {
       return await find("teams", `id = "${esc(ref)}" || name = "${esc(ref)}"`);
     },
@@ -124,13 +133,16 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     } else if (cmd === "user") {
       const r = await api.user({ email: args.email, name: args.name ?? "", password: args.password, org: args.org, orgAdmin: !!args.orgAdmin, sectionManager: args.sectionManager });
       console.log(`Konto ${r.user.email} (${r.user.id})` + (r.password ? ` – Startpasswort: ${r.password}` : ""));
+    } else if (cmd === "team") {
+      const tm = await api.createTeam({ section: args.section, name: args.name, org: args.org, trainer: args.trainer });
+      console.log(`Team ${tm.name} (${tm.id})`);
     } else if (cmd === "grant" || cmd === "revoke") {
       const t = await api.grant(args.email, args.team, cmd === "grant");
       console.log(`${cmd === "grant" ? "Zugriff erteilt" : "Zugriff entzogen"}: ${args.email} → ${t.name}`);
     } else if (cmd === "overview") {
       console.log(JSON.stringify(await api.overview(), null, 2));
     } else {
-      console.error("Befehle: bootstrap | user | grant | revoke | overview (siehe Kopf der Datei)");
+      console.error("Befehle: bootstrap | user | team | grant | revoke | overview (siehe Kopf der Datei)");
       process.exit(2);
     }
   } catch (err) { console.error(err.message); process.exit(1); }
