@@ -321,13 +321,22 @@ von Staging durch die lokale Claude-Code-Session mit SSH-Zugang.
 | GitHub-Staging-Deploy | **deaktiviert** (keine Variable `STAGING_DEPLOY_ENABLED`, keine Secrets; Deploy-Job wird übersprungen) |
 | Update-Prozess | `cd /opt/trainerhub-staging && sudo git fetch && sudo git checkout <commit> && cd deploy && sudo ./scripts/deploy.sh` |
 
-### Angelegte Struktur (ohne Zugangsdaten)
+### Angelegte Struktur und Berechtigungen (ohne Zugangsdaten)
 
-- Verein **TV Bretten** → Abteilung **Basketball** → Team **U16w**
-- Konto *Florian* (Alltag): Vereinsmitglied, **Trainer:in von U16w**, kein Admin
-- Konto *Florian (Vereins-Admin)*: separates Konto, Vereins-Admin, keinem Team als Trainer:in zugeordnet
-- PocketBase-Superuser: nur für Serververwaltung (SSH-Tunnel), öffentlich nicht erreichbar
+Stand nach Migration `1760000200_permission_profiles` (Staging-Update auf `5ef9ce7`, 26.09.2026):
+
+| Konto | Zugehörigkeit | technische Berechtigungen |
+| --- | --- | --- |
+| *Florian* (Alltag) | TV Bretten | `coach` · TV Bretten › Basketball › **U16w** |
+| *Florian (Vereins-Admin)* | TV Bretten | `organisation_admin` · **TV Bretten** |
+| PocketBase-Superuser | – (eigene Collection `_superusers`) | keine TrainerHub-Berechtigung; nur Serververwaltung per SSH-Tunnel |
+
+- Verein **TV Bretten** → Abteilung **Basketball** (noch ohne `section_manager`) → Team **U16w**
 - Standard-Trainingsarten (4) der Abteilung und Hallen (4) des Vereins aus `bootstrap`
+- Keine Datenmigration nötig: Die bestehenden Relationen entsprachen bereits den Profilen; geändert
+  wurden nur Regeln und das zusätzliche Feld `functions`.
+- Update-Prüfung: `deploy.sh` legte vorher ein Backup an; Restore dieses Vor-Update-Backups in einer
+  getrennten Instanz mit der neuen Version → Migration läuft nach, Zuordnungen unverändert.
 
 ### Durchgeführte Prüfungen (26.09.2026)
 
