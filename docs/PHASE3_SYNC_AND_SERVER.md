@@ -51,6 +51,12 @@ Nichts ist auf „TV Bretten“ oder „Basketball“ festgelegt – beides sind
 
 Alle Collections haben zusätzlich `extra` (JSON), `created`, `updated`.
 
+**Anzahl eindeutig:** TrainerHub legt **10 Collections** an: die **9 Daten-Collections** der Tabelle
+(Typ `base`) plus **`users`** (Typ `auth`, PocketBase-Konten mit `email`, `name`). „9“ meint die
+Datenobjekte, „10“ zählt die Auth-Collection mit. Hinzu kommen 5 PocketBase-System-Collections
+(`_superusers`, `_authOrigins`, `_externalAuths`, `_mfas`, `_otps`), die nicht zu TrainerHub gehören.
+Auf dem Staging-Server am 26.09.2026 so festgestellt.
+
 Entscheidungen:
 
 - **Planung und Training bleiben getrennt** (Phase-2-Entscheidung). Die Verknüpfung liegt
@@ -267,7 +273,7 @@ scripts/pb-admin.mjs          Verein/Abteilung/Konten/Teams/Zugriffe anlegen (Su
 - **`PB_ENCRYPTION_KEY` gehört zum Backup** (getrennt und sicher aufbewahren): ohne denselben
   Schlüssel startet eine wiederhergestellte Instanz nicht.
 - **Geprüft:** Snapshot und PocketBase-Zip jeweils in eine getrennte Instanz (eigenes
-  Compose-Projekt, eigene Ports) wiederhergestellt; alle 10 Collections identisch (IDs und
+  Compose-Projekt, eigene Ports) wiederhergestellt; alle 10 TrainerHub-Collections identisch (IDs und
   `updated`), Anmeldung funktioniert.
 
 ## Tests
