@@ -35,7 +35,11 @@ export function NewSessionView({ data, onSave, back, go, params }) {
   const venues = data.venues ?? [];
 
   const [key] = useState(() => draftKey({ planId: plan?.id, date: params.date ?? todayISO() }));
-  const [restored] = useState(() => loadDraft(key));
+  // Eine bereits durchgeführte Planung (z. B. über einen alten Verlaufseintrag) nicht erneut erfassen
+  const [alreadyDone] = useState(() => !!plan?.recordedId && (data.sessions ?? []).some(s => s.id === plan.recordedId));
+  const [restored] = useState(() => alreadyDone ? null : loadDraft(key));
+  const [sessionId] = useState(uid);   // fest je Ablauf: ein Doppeltipp speichert nicht doppelt
+  const saved = useRef(false);
   const [form, setForm] = useState(() => restored?.form ?? initialForm(data, params, plan));
   const [att, setAtt] = useState(() => restored?.att ?? (step === 2 ? defaultAtt(getTeamPlayers(form.teamId, data)) : null));
   const [showRestored, setShowRestored] = useState(!!restored);
@@ -50,20 +54,24 @@ export function NewSessionView({ data, onSave, back, go, params }) {
   const players = getTeamPlayers(form.teamId, data);
   const playerMap = Object.fromEntries(players.map(p => [p.id, p]));
 
-  // Entwurf sichern, sobald tatsächlich etwas erfasst wurde (bloßes Öffnen legt keinen an)
+  // Entwurf sichern, sobald tatsächlich etwas erfasst wurde (bloßes Öffnen legt keinen an).
+  // dirty: wiederhergestellter Entwurf oder Rahmen in Schritt 1 gewählt – dann immer sichern.
   const pristine = useRef(null);
+  const dirty = useRef(!!restored);
   useEffect(() => {
-    if (!att) return;
+    if (!att || saved.current) return;
     const snapshot = JSON.stringify({ form, att });
-    if (pristine.current === null) pristine.current = restored ? "" : snapshot;
-    if (snapshot !== pristine.current) saveDraft(key, { form, att });
-  }, [key, form, att, restored]);
+    if (pristine.current === null) pristine.current = snapshot;
+    if (dirty.current || snapshot !== pristine.current) { dirty.current = true; saveDraft(key, { form, att }); }
+  }, [key, form, att]);
 
   function discardDraft() {
     clearDraft();
     pristine.current = null;
-    setForm(initialForm(data, params, plan));
-    setAtt(step === 2 ? defaultAtt(getTeamPlayers(plan?.teamId ?? form.teamId, data)) : null);
+    dirty.current = false;
+    const fresh = initialForm(data, params, plan);
+    setForm(fresh);
+    setAtt(step === 2 ? defaultAtt(getTeamPlayers(fresh.teamId, data)) : null);
     setShowRestored(false);
   }
 
@@ -75,11 +83,25 @@ export function NewSessionView({ data, onSave, back, go, params }) {
 
   const steps = params.steps ?? 1;
   function toAttendance() {
+    dirty.current = true;   // gewählter Rahmen soll ein Beenden der App überstehen
     // Anwesenheit neu aufbauen, wenn das Team gewechselt wurde
     if (!att || att.some(a => !playerMap[a.playerId]) || att.length !== players.length) setAtt(defaultAtt(players));
     go("new_session", { ...params, step: 2, steps: steps + 1 });
   }
   const changeFrame = () => go("new_session", { ...params, step: 1, steps: steps + 1 });
+
+  if (alreadyDone) {
+    return (
+      <div className="page">
+        <PageHeader title="Training" back={back} />
+        <div className="page-body">
+          <EmptyState icon={CheckCheck} title="Bereits durchgeführt"
+            text="Dieses geplante Training wurde schon erfasst."
+            action={<Button variant="primary" onClick={() => go("session_detail", { sessionId: plan.recordedId }, { replace: true })}>Erfasstes Training öffnen</Button>} />
+        </div>
+      </div>
+    );
+  }
 
   if (!teams.length) {
     return (
@@ -115,8 +137,11 @@ export function NewSessionView({ data, onSave, back, go, params }) {
     const prepNote = plan ? content(plan).note : "";
 
     function save() {
+      if (saved.current) return;
+      saved.current = true;
+      clearDraft();
       onSave({
-        id: uid(), teamId: form.teamId, trainingTypeId: form.trainingTypeId,
+        id: sessionId, teamId: form.teamId, trainingTypeId: form.trainingTypeId,
         date: form.date, durationMinutes: form.durationMinutes, factor: calcFactor(form.durationMinutes),
         attendance: att, note: form.note.trim(),
         venueId: form.venueId ?? null,
@@ -125,8 +150,7 @@ export function NewSessionView({ data, onSave, back, go, params }) {
         ...(form.focus.trim() ? { focus: form.focus.trim() } : {}),
         ...(form.tags.length ? { tags: normalizeTags(form.tags) } : {}),
         ...(plan ? { planId: plan.id } : {}),
-      }, plan?.id);
-      clearDraft();
+      });
     }
 
     return (

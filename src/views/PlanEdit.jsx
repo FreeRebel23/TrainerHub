@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { FileText, Tags, AlertTriangle, Sun } from "lucide-react";
+import { FileText, Tags, AlertTriangle, Sun, Users } from "lucide-react";
 import { DURATIONS } from "../lib/constants.js";
 import { byId, calcFactor, uid } from "../lib/data.js";
 import { fmtDateFull, getHoliday, getSchoolHoliday } from "../lib/dates.js";
 import {
   planDefaults, duplicateAsPlan, content, normalizeTags, normalizeDrill, drillMinutes, knownTags,
 } from "../lib/training.js";
-import { Button, PageHeader, Section, Field, ChoiceChips, Notice } from "../components/ui.jsx";
+import { Button, PageHeader, Section, Field, ChoiceChips, Notice, EmptyState } from "../components/ui.jsx";
 import { DrillList, TagPicker } from "../components/training.jsx";
 
 const fmtFactor = f => String(f).replace(".", ",");
@@ -32,7 +32,7 @@ function initialDraft(data, params) {
 
 // Ein Planungsweg für alles: neu (Trainingsbuch, Kalendertag), bearbeiten, duplizieren.
 // Schnell: Datum + Team + Speichern. Ausführlich: Uhrzeit, Schwerpunkt, Themen, Übungen, Notiz.
-export function PlanEditView({ data, update, params, back, finishFlow }) {
+export function PlanEditView({ data, update, params, go, back, finishFlow }) {
   const teams  = data.teams ?? [];
   const types  = data.trainingTypes ?? [];
   const venues = data.venues ?? [];
@@ -79,6 +79,20 @@ export function PlanEditView({ data, update, params, back, finishFlow }) {
   }
 
   const title = isEdit ? "Planung bearbeiten" : isDup ? "Training duplizieren" : "Training planen";
+
+  // Ohne Team lässt sich nicht speichern – statt eines stummen Speichern-Buttons ein Weg weiter
+  if (!teams.length) {
+    return (
+      <div className="page">
+        <PageHeader title={title} back={back} />
+        <div className="page-body">
+          <EmptyState icon={Users} title="Noch kein Team"
+            text="Lege zuerst ein Team an, dann kannst du Trainings planen."
+            action={<Button variant="primary" onClick={() => go("teams", {}, { root: true })}>Zu den Teams</Button>} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page">

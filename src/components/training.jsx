@@ -185,7 +185,9 @@ export function TagPicker({ value, onChange, options }) {
   function addCustom() {
     const t = custom.trim();
     if (!t) return;
-    onChange(normalizeTags([...value, t]));
+    // Bekanntes Thema in anderer Schreibweise ("wurf") → bestehende Schreibweise ("Wurf") verwenden
+    const known = options.find(o => o.toLocaleLowerCase("de") === t.toLocaleLowerCase("de"));
+    onChange(normalizeTags([...value, known ?? t]));
     setCustom("");
   }
   return (
