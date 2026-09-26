@@ -4,7 +4,7 @@ import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 
 export default [
-  { ignores: ["dist", "dev-dist", "node_modules"] },
+  { ignores: ["dist", "dev-dist", "node_modules", ".cache", "pocketbase/pb_data"] },
   js.configs.recommended,
   {
     files: ["**/*.{js,jsx,mjs}"],
@@ -26,7 +26,16 @@ export default [
     },
   },
   {
-    files: ["scripts/**", "vite.config.js", "eslint.config.js", "**/*.test.js"],
+    files: ["scripts/**", "test/**", "e2e/**", "vite.config.js", "vitest*.config.js", "eslint.config.js", "**/*.test.js"],
     languageOptions: { globals: { ...globals.node } },
+  },
+  {
+    // PocketBase-JSVM (Migrationen/Hooks laufen im Server, nicht im Browser)
+    files: ["pocketbase/**/*.js"],
+    languageOptions: {
+      sourceType: "script",
+      globals: { migrate: "readonly", Collection: "readonly", RelationField: "readonly", routerAdd: "readonly",
+        onRecordAfterUpdateSuccess: "readonly", $app: "readonly", $os: "readonly" },
+    },
   },
 ];

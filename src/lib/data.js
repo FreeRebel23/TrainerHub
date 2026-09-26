@@ -29,16 +29,22 @@ export function migrate(d) {
   return d;
 }
 
-export function loadData() {
+export function loadData(storage = globalThis.localStorage) {
   try {
-    const r = localStorage.getItem(STORE_KEY);
+    const r = storage.getItem(STORE_KEY);
     if (r) return migrate(JSON.parse(r));
   } catch { /* defekter Speicher → Startdaten */ }
   return clone(INIT);
 }
 
-export function persist(d) {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(d)); } catch { /* Speicher voll/gesperrt */ }
+// Liefert false, wenn der Speicher voll/gesperrt ist (der Sync zeigt das an)
+export function persist(d, storage = globalThis.localStorage) {
+  try { storage.setItem(STORE_KEY, JSON.stringify(d)); return true; } catch { return false; }
+}
+
+// Gibt es überhaupt einen gespeicherten Datenstand auf diesem Gerät?
+export function hasStoredData(storage = globalThis.localStorage) {
+  try { return storage.getItem(STORE_KEY) !== null; } catch { return false; }
 }
 
 export function useData() {

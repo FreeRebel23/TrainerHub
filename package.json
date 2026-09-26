@@ -9,8 +9,11 @@
     "preview": "vite preview --host",
     "lint": "eslint .",
     "test": "vitest run",
-    "check": "npm run lint && npm run test && npm run build",
-    "icons": "node scripts/gen-icons.mjs"
+    "check": "npm run lint && npm run test && npm run test:integration && npm run build",
+    "icons": "node scripts/gen-icons.mjs",
+    "test:integration": "vitest run --config vitest.integration.config.js",
+    "pb:fetch": "node scripts/fetch-pocketbase.mjs",
+    "pb:admin": "node scripts/pb-admin.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
