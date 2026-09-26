@@ -1,4 +1,5 @@
 import { useData } from "./lib/data.js";
+import { recordSession, removeSession } from "./lib/training.js";
 import { useNav } from "./lib/nav.js";
 import { useTheme } from "./lib/theme.js";
 import { usePwaUpdate } from "./usePwaUpdate.js";
@@ -30,29 +31,15 @@ export default function App() {
   const v = nav.view;
   const p = nav.params ?? {};
 
-  function saveSession(sess, planId) {
+  function saveSession(sess) {
     const sessWithAuthor = { ...sess, erfasstVon: data.settings?.trainerName ?? "" };
-    update(d => {
-      const next = { ...d, sessions: [...(d.sessions ?? []), sessWithAuthor] };
-      if (planId) {
-        next.plannedSessions = (d.plannedSessions ?? []).map(pl =>
-          pl.id === planId ? { ...pl, recordedId: sess.id } : pl
-        );
-      }
-      return next;
-    });
+    update(d => recordSession(d, sessWithAuthor));
     // Assistent aus dem Verlauf nehmen: Zurück führt danach dorthin, wo das Erfassen begann
     finishFlow(p.steps ?? 1, "session_detail", { sessionId: sess.id });
   }
 
   function deleteSession(id) {
-    update(d => ({
-      ...d,
-      sessions: (d.sessions ?? []).filter(s => s.id !== id),
-      plannedSessions: (d.plannedSessions ?? []).map(pl =>
-        pl.recordedId === id ? { ...pl, recordedId: null } : pl
-      ),
-    }));
+    update(d => removeSession(d, id));
     back("training");
   }
 

@@ -49,7 +49,13 @@ export function useData() {
   return { data, update };
 }
 
-export function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
+// Zeitstempel + 8 Zufallszeichen. Mehrere IDs in derselben Millisekunde (z. B. alle Übungen beim
+// Duplizieren) dürfen nicht kollidieren – Übungen werden über ihre ID abgehakt und entfernt.
+export function uid() {
+  let r = "";
+  while (r.length < 8) r += Math.random().toString(36).slice(2);
+  return Date.now().toString(36) + r.slice(0, 8);
+}
 
 // ─── Fachliche Helfer ───
 

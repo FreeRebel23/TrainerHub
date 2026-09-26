@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   content, planStatus, normalizeTags, normalizeDrill, drillMinutes, moveItem, byDateTime,
   duplicateAsPlan, sessionDraftFromPlan, planDefaults, knownTags, matchesQuery, seasonOverview,
+  recordSession, removeSession,
 } from "./training.js";
 
 // Planung im alten Format (vor Phase 2): keine Uhrzeit, kein Inhalt
@@ -173,5 +174,99 @@ describe("Saisonübersicht", () => {
     expect(o.drills).toEqual({ planned: 2, done: 1 });
     expect(o.attendanceRate).toBe(50);
     expect(seasonOverview([]).attendanceRate).toBeNull();
+  });
+});
+
+describe("Kopien sind unabhängig vom Original", () => {
+  it("Duplikat: Ändern von Übungen und Themen verändert die Quelle nicht", () => {
+    const d = duplicateAsPlan(prepared);
+    d.checklist[0].text = "geändert"; d.checklist[0].done = true; d.checklist.push({ id: "n", text: "neu" });
+    expect(prepared.checklist[0]).toEqual({ id: "d1", text: "Aufwärmen", minutes: 15, done: true });
+    expect(prepared.checklist).toHaveLength(3);
+  });
+
+  it("Duplikat einer bereits durchgeführten Planung ist eine offene Planung mit neuen IDs", () => {
+    const d = duplicateAsPlan({ ...prepared, recordedId: "s9" });
+    expect(d.recordedId).toBeNull();
+    expect(planStatus(d)).toBe("prepared");
+    expect(new Set(d.checklist.map(x => x.id)).size).toBe(3);
+    expect(d.checklist.some(x => ["d1", "d2", "d3"].includes(x.id))).toBe(false);
+  });
+
+  it("Durchführen: Änderungen im Training verändern die Planung nicht", () => {
+    const s = sessionDraftFromPlan(prepared);
+    s.checklist[1].done = true; s.checklist[1].text = "anders"; s.tags.push("Neu");
+    expect(prepared.checklist[1]).toEqual({ id: "d2", text: "3-gegen-2", minutes: 20, note: "Mitte besetzen" });
+    expect(prepared.tags).toEqual(["Transition", "Passspiel"]);
+  });
+});
+
+describe("Abschließen und Löschen – Verknüpfung Planung ↔ Training", () => {
+  const base = () => ({ sessions: [], plannedSessions: [{ ...legacyPlan }, { ...prepared }] });
+  const sess = (id, planId) => ({ id, date: "2026-10-01", teamId: "t", durationMinutes: 90, attendance: [], ...(planId ? { planId } : {}) });
+
+  it("verknüpft Planung und Training in beide Richtungen", () => {
+    const d = recordSession(base(), sess("s1", "p2"));
+    expect(d.sessions.map(s => s.id)).toEqual(["s1"]);
+    expect(d.plannedSessions.find(p => p.id === "p2").recordedId).toBe("s1");
+    expect(d.plannedSessions.find(p => p.id === "p1").recordedId).toBeNull();
+  });
+
+  it("Doppeltipp auf „Abschließen“ speichert das Training nur einmal", () => {
+    const once = recordSession(base(), sess("s1", "p2"));
+    const twice = recordSession(once, sess("s1", "p2"));
+    expect(twice).toBe(once);
+    expect(twice.sessions).toHaveLength(1);
+  });
+
+  it("zweites Training zur selben Planung: gespeichert, bestehende Verknüpfung bleibt", () => {
+    const d = recordSession(recordSession(base(), sess("s1", "p2")), sess("s2", "p2"));
+    expect(d.sessions.map(s => s.id)).toEqual(["s1", "s2"]);
+    expect(d.plannedSessions.find(p => p.id === "p2").recordedId).toBe("s1");
+  });
+
+  it("Planung mit Verweis auf nicht mehr vorhandenes Training wird neu verknüpft", () => {
+    const data = { sessions: [], plannedSessions: [{ ...prepared, recordedId: "weg" }] };
+    expect(recordSession(data, sess("s3", "p2")).plannedSessions[0].recordedId).toBe("s3");
+  });
+
+  it("Training ohne Planung bzw. zu gelöschter Planung: kein Fehler, Planungen unverändert", () => {
+    const b = base();
+    expect(recordSession(b, sess("s1")).plannedSessions).toEqual(b.plannedSessions);
+    expect(recordSession(b, sess("s1", "geloescht")).plannedSessions).toEqual(b.plannedSessions);
+    expect(recordSession({ sessions: [] }, sess("s1", "p2")).sessions).toHaveLength(1);   // Altdaten ohne plannedSessions
+  });
+
+  it("Löschen eines Trainings öffnet die Planung wieder, andere bleiben unberührt", () => {
+    const d = recordSession(recordSession(base(), sess("s1", "p2")), sess("s2"));
+    const r = removeSession(d, "s1");
+    expect(r.sessions.map(s => s.id)).toEqual(["s2"]);
+    expect(r.plannedSessions.find(p => p.id === "p2").recordedId).toBeNull();
+    expect(planStatus(r.plannedSessions.find(p => p.id === "p2"))).toBe("prepared");
+    expect(d.sessions).toHaveLength(2);   // Eingabe nicht mutiert
+  });
+});
+
+describe("Altdaten mit nur einem Teil der neuen Felder", () => {
+  const partial = { id: "x", teamId: "t", trainingTypeId: "bb", durationMinutes: 60, date: "2026-10-03",
+    tags: "Defense", checklist: [{ id: "c1" }, { id: "c2", text: null, note: 5 }], focus: undefined, time: null };
+
+  it("Defaults greifen, Status, Suche und Auswertung stürzen nicht ab", () => {
+    expect(content(partial)).toMatchObject({ tags: [], time: "", focus: "" });
+    expect(planStatus(partial)).toBe("prepared");
+    expect(() => matchesQuery(partial, "defense", {})).not.toThrow();
+    expect(() => seasonOverview([partial])).not.toThrow();
+    expect(duplicateAsPlan(partial).checklist.map(d => d.text)).toEqual(["", ""]);
+  });
+});
+
+describe("Saisonübersicht – Schreibweisen", () => {
+  it("Themen in unterschiedlicher Groß-/Kleinschreibung werden zusammengezählt", () => {
+    const o = seasonOverview([
+      { date: "2026-09-01", durationMinutes: 90, tags: ["Wurf"] },
+      { date: "2026-09-02", durationMinutes: 60, tags: ["wurf", "Defense"] },
+    ]);
+    expect(o.tags).toEqual([{ tag: "Wurf", count: 2, minutes: 150 }, { tag: "Defense", count: 1, minutes: 60 }]);
+    expect(o.untagged).toBe(0);
   });
 });

@@ -119,6 +119,32 @@ export function sessionDraftFromPlan(plan) {
   };
 }
 
+// ─── Abschließen und Löschen ───
+
+// Erfasstes Training übernehmen und die Planung (sess.planId) als durchgeführt verknüpfen.
+// Idempotent: Ein zweiter Aufruf mit demselben Training (Doppeltipp) ändert nichts. Ist die
+// Planung bereits mit einem vorhandenen Training verknüpft, bleibt diese Verknüpfung bestehen –
+// das neue Training wird trotzdem gespeichert (nie Daten verwerfen).
+export function recordSession(data, sess) {
+  const sessions = data.sessions ?? [];
+  if (sessions.some(s => s.id === sess.id)) return data;
+  const next = { ...data, sessions: [...sessions, sess] };
+  if (sess.planId) {
+    next.plannedSessions = (data.plannedSessions ?? []).map(p =>
+      p.id === sess.planId && !sessions.some(s => s.id === p.recordedId) ? { ...p, recordedId: sess.id } : p);
+  }
+  return next;
+}
+
+// Training löschen; eine darauf verweisende Planung gilt danach wieder als offen
+export function removeSession(data, id) {
+  return {
+    ...data,
+    sessions: (data.sessions ?? []).filter(s => s.id !== id),
+    plannedSessions: (data.plannedSessions ?? []).map(p => p.recordedId === id ? { ...p, recordedId: null } : p),
+  };
+}
+
 // ─── Defaults für neue Planungen ───
 
 // Team: zuletzt verwendetes Team (oder erstes). Halle, Art, Dauer, Uhrzeit: aus der letzten
@@ -164,7 +190,7 @@ export function matchesQuery(x, q, data) {
     byId(data.teams, x.teamId)?.name, c.focus, c.note, ...c.tags,
     ...c.checklist.flatMap(d => [d.text, d.note]),
   ];
-  return hay.some(t => (t ?? "").toLocaleLowerCase("de").includes(query));
+  return hay.some(t => String(t ?? "").toLocaleLowerCase("de").includes(query));
 }
 
 // ─── Saisonübersicht ───
@@ -182,10 +208,12 @@ export function seasonOverview(sessions) {
     const c = content(s);
     const tags = normalizeTags(c.tags);
     if (!tags.length) untagged++;
+    // Groß-/Kleinschreibung zählt nicht ("Wurf" = "wurf"), angezeigt wird die erste Schreibweise
     tags.forEach(t => {
-      const e = byTag.get(t) ?? { tag: t, count: 0, minutes: 0 };
+      const key = t.toLocaleLowerCase("de");
+      const e = byTag.get(key) ?? { tag: t, count: 0, minutes: 0 };
       e.count++; e.minutes += s.durationMinutes ?? 0;
-      byTag.set(t, e);
+      byTag.set(key, e);
     });
     const ym = s.date.slice(0, 7);
     const m = byMonth.get(ym) ?? { month: ym, count: 0, minutes: 0 };

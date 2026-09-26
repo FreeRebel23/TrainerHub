@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { migrate, computeRanking, countPresent, calcFactor, getActiveSeason, allGamedays } from "./data.js";
+import { migrate, computeRanking, countPresent, calcFactor, getActiveSeason, allGamedays, uid } from "./data.js";
 import { INIT } from "./constants.js";
 
 describe("migrate", () => {
@@ -84,5 +84,15 @@ describe("Fachlogik", () => {
   it("sammelt Spieltage aller Saisons mit Team-Bezug", () => {
     const g = allGamedays({ seasons: [{ id: "s", teamId: "t", gamedays: [{ id: "g", date: "2026-09-27" }] }] });
     expect(g).toEqual([{ id: "g", date: "2026-09-27", teamId: "t", seasonId: "s" }]);
+  });
+});
+
+describe("uid", () => {
+  it("viele IDs in derselben Millisekunde kollidieren nicht (Duplizieren vieler Übungen)", () => {
+    for (let round = 0; round < 200; round++) {
+      const ids = Array.from({ length: 50 }, uid);
+      expect(new Set(ids).size).toBe(50);
+    }
+    expect(uid()).toMatch(/^[0-9a-z]{16,}$/);
   });
 });
