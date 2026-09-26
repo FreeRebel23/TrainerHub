@@ -14,6 +14,7 @@ import { createClient, SyncError } from "./client.js";
 import { toServerSets, fromServerSets, fieldsToLocal, localToFields, BY_NAME, PUSH_ORDER, COLLECTIONS } from "./mapping.js";
 import { pendingChanges, rebase } from "./engine.js";
 import { runSync, pullAll, rekeyId } from "./runner.js";
+import { permissionSummary, canCreateTeams } from "./permissions.js";
 import { loadMeta, saveMeta, loadBase, saveBase, clearSync, emptyMeta } from "./store.js";
 import { hasLocalContent, prepareUpload, summarize, EMPTY_DATA } from "./legacy.js";
 
@@ -50,6 +51,9 @@ export class SyncController {
     if (!this.meta.bound) return "migrate";
     return "ready";
   }
+  // Darf dieses Konto in der aktuellen Abteilung Teams anlegen? (nur Anzeige; der Server entscheidet)
+  get canCreateTeams() { return canCreateTeams(this.meta.permissions, this.meta); }
+
   get ctx() { return { userId: this.meta.user?.id, organizationId: this.meta.organizationId, sectionId: this.meta.sectionId }; }
 
   computePending() {
@@ -117,6 +121,7 @@ export class SyncController {
       ?? sections[0] ?? null;
     this.meta.sectionId = section?.id ?? null;
     this.meta.organizationId = section?.organization ?? orgs[0]?.id ?? null;
+    this.meta.permissions = permissionSummary(me, { organizations: orgs, sections, teams });
     this.data = {
       ...this.data,
       organizations: orgs.map(o => ({ id: o.id, name: o.name })),
@@ -246,6 +251,7 @@ export class SyncController {
       conflicts: [...(this.meta.conflicts ?? []), ...out.conflicts],
       errors: out.errors,
       held: out.held.length,
+      permissions: out.permissions ?? this.meta.permissions,
     };
     this.saveAll();
     this.pendingCount = this.computePending();

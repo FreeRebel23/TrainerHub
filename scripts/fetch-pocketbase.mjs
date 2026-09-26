@@ -2,7 +2,7 @@
 // .cache/pocketbase/<version>/pocketbase – für Integrationstests und lokales Arbeiten.
 // Der Docker-Build lädt dieselbe Version unabhängig davon (pocketbase/Dockerfile).
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, writeFileSync, chmodSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync, chmodSync, renameSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,10 +29,16 @@ export async function ensurePocketBase() {
   if (got !== sha256[key]) throw new Error(`Prüfsumme stimmt nicht für ${url}`);
   const dir = dirname(bin);
   mkdirSync(dir, { recursive: true });
-  const zip = join(dir, "pocketbase.zip");
-  writeFileSync(zip, buf);
-  execFileSync("unzip", ["-o", "-q", zip, "pocketbase", "-d", dir]);
-  chmodSync(bin, 0o755);
+  // In einem eigenen Temp-Verzeichnis entpacken und atomar umbenennen: parallele Testdateien
+  // laden sonst gleichzeitig in dieselbe Datei und zerstören sich das Archiv gegenseitig.
+  const tmp = mkdtempSync(join(dir, ".dl-"));
+  try {
+    const zip = join(tmp, "pocketbase.zip");
+    writeFileSync(zip, buf);
+    execFileSync("unzip", ["-o", "-q", zip, "pocketbase", "-d", tmp]);
+    chmodSync(join(tmp, "pocketbase"), 0o755);
+    renameSync(join(tmp, "pocketbase"), bin);
+  } finally { rmSync(tmp, { recursive: true, force: true }); }
   return bin;
 }
 

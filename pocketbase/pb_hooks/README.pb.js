@@ -1,1 +1,1 @@
-// Platz für PocketBase-JS-Hooks (derzeit keine nötig – Regeln erledigen die Rechte).
+// Hooks: permissions.pb.js (Berechtigungs-Invarianten, Logik in permissions.js).

@@ -64,11 +64,10 @@ describe("Mandantentrennung und Team-Rechte", () => {
     await expect(c.coach.create("players", { section: t.handball.id, name: "X" })).rejects.toMatchObject({ status: 400 });
   });
 
-  it("Trainer:innen-Zuordnung ändern nur Admins; neue Teams nur mit sich selbst", async () => {
+  it("coach: Zuordnungen ändern und Teams anlegen ist nicht erlaubt", async () => {
     await expect(c.coach.update("teams", team.u14.id, { trainers: [t.users.coach.id, t.users.hand.id] })).rejects.toMatchObject({ kind: "notfound" });
-    await expect(c.coach.create("teams", { section: t.basketball.id, name: "U12", trainers: [t.users.coach.id, t.users.hand.id] })).rejects.toMatchObject({ status: 400 });
-    const own = await c.coach.create("teams", { section: t.basketball.id, name: "U12", trainers: [t.users.coach.id] });
-    expect(own.trainers).toEqual([t.users.coach.id]);
+    // seit 1760000200 legen nur section_manager/organisation_admin Teams an – auch nicht „mit sich selbst“
+    await expect(c.coach.create("teams", { section: t.basketball.id, name: "U12", trainers: [t.users.coach.id] })).rejects.toMatchObject({ status: 400 });
     await expect(c.coach.create("teams", { section: t.handball.id, name: "fremd", trainers: [t.users.coach.id] })).rejects.toMatchObject({ status: 400 });
   });
 
@@ -80,10 +79,11 @@ describe("Mandantentrennung und Team-Rechte", () => {
     await expect(c.coach.remove("training_types", types[0].id)).rejects.toMatchObject({ kind: "notfound" });
   });
 
-  it("Vereine/Abteilungen sind lesbar für Mitglieder, änderbar nur als Superuser", async () => {
+  it("Vereine sind lesbar für Zugehörige; Anlegen nur als Superuser, Ändern nur organisation_admin", async () => {
     expect(names(await c.coach.listAll("organizations"))).toEqual(["Verein A"]);
-    await expect(c.florian.update("organizations", t.orgA.id, { name: "x" })).rejects.toMatchObject({ status: 403 });
+    await expect(c.coach.update("organizations", t.orgA.id, { name: "x" })).rejects.toMatchObject({ kind: "notfound" });
     await expect(c.coach.create("organizations", { name: "neu" })).rejects.toMatchObject({ status: 403 });
+    await expect(c.florian.create("organizations", { name: "neu" })).rejects.toMatchObject({ status: 403 });
   });
 
   it("keine Selbstregistrierung, Konten sehen nur sich selbst", async () => {

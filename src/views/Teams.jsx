@@ -8,7 +8,9 @@ import {
 } from "../components/ui.jsx";
 import { useConfirm } from "../components/confirm.jsx";
 
-export function TeamsView({ data, update, go }) {
+export function TeamsView({ data, update, go, sync }) {
+  // Mit Server legen nur Abteilungsleitung/Vereins-Admin Teams an (serverseitig erzwungen)
+  const canAdd = sync?.mode !== "ready" || sync.canCreateTeams;
   const [showAdd, setShowAdd] = useState(false);
   const [name, setName]       = useState("");
   const teams = data.teams ?? [];
@@ -22,7 +24,7 @@ export function TeamsView({ data, update, go }) {
   return (
     <div className="page">
       <PageIntro title="Teams"
-        actions={!showAdd && <Button size="sm" icon={Plus} onClick={() => setShowAdd(true)}>Team</Button>} />
+        actions={canAdd && !showAdd && <Button size="sm" icon={Plus} onClick={() => setShowAdd(true)}>Team</Button>} />
       <div className="page-body">
         {showAdd && (
           <form className="card form expand" onSubmit={e => { e.preventDefault(); addTeam(); }}>
@@ -38,9 +40,14 @@ export function TeamsView({ data, update, go }) {
         )}
 
         {teams.length === 0 && !showAdd ? (
-          <EmptyState icon={Users} title="Noch kein Team"
-            text="Lege dein erstes Team an und füge Spieler:innen hinzu."
-            action={<Button variant="primary" icon={Plus} onClick={() => setShowAdd(true)}>Team anlegen</Button>} />
+          canAdd ? (
+            <EmptyState icon={Users} title="Noch kein Team"
+              text="Lege dein erstes Team an und füge Spieler:innen hinzu."
+              action={<Button variant="primary" icon={Plus} onClick={() => setShowAdd(true)}>Team anlegen</Button>} />
+          ) : (
+            <EmptyState icon={Users} title="Noch kein Team zugeordnet"
+              text="Teams legt die Abteilungsleitung an und ordnet dich als Trainer:in zu." />
+          )
         ) : (
           <div className="list">
             {teams.map(t => {
@@ -58,6 +65,9 @@ export function TeamsView({ data, update, go }) {
               );
             })}
           </div>
+        )}
+        {!canAdd && teams.length > 0 && (
+          <p className="field__hint">Weitere Teams legt die Abteilungsleitung an und ordnet dich zu.</p>
         )}
       </div>
     </div>

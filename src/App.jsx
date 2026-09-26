@@ -55,7 +55,7 @@ export default function App() {
                              back={() => back(p.edit ? "session_detail" : "training", p.edit ? { sessionId: p.sessionId } : {})} onDelete={deleteSession} />; break;
     case "plan_edit":      page = <PlanEditView {...common} params={p} finishFlow={finishFlow} back={() => back(p.planId ? "plan_detail" : "training", p.planId ? { planId: p.planId } : {})} />; break;
     case "plan_detail":    page = <PlanDetailView {...common} planId={p.planId} back={() => back("training")} />; break;
-    case "teams":          page = <TeamsView {...common} />; break;
+    case "teams":          page = <TeamsView {...common} sync={sync} />; break;
     case "team_detail":    page = <TeamDetailView {...common} teamId={p.teamId} back={() => back("teams")} />; break;
     case "season_list":    page = <SeasonListView {...common} teamId={p.teamId} back={() => back("team_detail", { teamId: p.teamId })} />; break;
     case "new_season":     page = <NewSeasonView {...common} teamId={p.teamId} back={() => back("season_list", { teamId: p.teamId })} />; break;

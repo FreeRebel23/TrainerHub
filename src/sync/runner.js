@@ -6,18 +6,24 @@ import { PUSH_ORDER, BY_NAME, recordToFields, toServerSets, same } from "./mappi
 import { stableId } from "./legacy.js";
 import { reconcile, orderOps, sanitizeRelations } from "./engine.js";
 import { SyncError, isDuplicateId } from "./client.js";
+import { permissionSummary } from "./permissions.js";
 
 export async function pullAll(client) {
   const remote = {}, created = {};
+  let teamRecords = [];
   for (const name of PUSH_ORDER) {
     const items = await client.listAll(name);
+    if (name === "teams") teamRecords = items;
     const m = new Map();
     items.forEach(r => { m.set(r.id, { f: recordToFields(name, r), u: r.updated }); created[r.id] = r.created; });
     remote[name] = m;
   }
-  const organizations = (await client.listAll("organizations")).map(o => ({ id: o.id, name: o.name }));
-  const sections = (await client.listAll("sections")).map(s => ({ id: s.id, name: s.name, organizationId: s.organization, sport: s.sport }));
-  return { remote, created, organizations, sections };
+  const orgRecords = await client.listAll("organizations");
+  const sectionRecords = await client.listAll("sections");
+  const organizations = orgRecords.map(o => ({ id: o.id, name: o.name }));
+  const sections = sectionRecords.map(s => ({ id: s.id, name: s.name, organizationId: s.organization, sport: s.sport }));
+  const permissions = permissionSummary(client.userId, { organizations: orgRecords, sections: sectionRecords, teams: teamRecords });
+  return { remote, created, organizations, sections, permissions };
 }
 
 export const rekeyId = (userId, coll, id) => stableId(userId, coll, id, "rekey");
@@ -111,6 +117,6 @@ export async function runSync({ client, data, base, ctx, allowMassDelete = false
 
   return {
     result, snapshot, nextBase, remap, conflicts, errors, held: rec.held, interrupted, created,
-    organizations: pulled.organizations, sections: pulled.sections,
+    organizations: pulled.organizations, sections: pulled.sections, permissions: pulled.permissions,
   };
 }
