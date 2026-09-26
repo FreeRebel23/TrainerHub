@@ -297,6 +297,41 @@ describe("Sicherheit gegen Datenverlust", () => {
     expect(sessions.find(s => s.id === "mz1sess0002").note).toBe("noch wichtig");
   });
 
+  it("Staging-Weg: neues Gerät, Backup-Datei des alten Geräts übernehmen – ergänzt, ersetzt nie", async () => {
+    // Trainer mit eigenem, leerem Verein (andere Origin als GitHub Pages → Übernahme per Datei)
+    await pb.admin.bootstrap({ org: "Verein C", section: "Basketball" });
+    await pb.admin.user({ email: "neu@test.local", name: "Neu", password: PASSWORD, org: "Verein C", orgAdmin: true });
+    const D = device();
+    expect(await D.c.login("neu@test.local", PASSWORD)).toBe("ready");
+    expect(D.c.data.teams).toEqual([]);
+    const backup = legacyData();
+    const n = await D.c.importBackup(backup);
+    expect(n).toMatchObject({ teams: 1, sessions: 2, plans: 2 });
+    const st = await D.c.sync();
+    expect(st.state, JSON.stringify(D.c.meta.errors)).toBe("synced");
+    const team = D.c.data.teams.find(x => x.name === "U16w");
+    expect(team.playerIds).toHaveLength(5);
+    // Dieselben IDs gibt es schon in Verein A (unsichtbar) → neue IDs, Verknüpfungen stimmen
+    const sess = D.c.data.sessions.find(x => x.note === "Phase 1");
+    const plan = D.c.data.plannedSessions.find(x => x.date === "2026-09-10");
+    expect(sess.id).not.toBe("mz1sess0001");
+    expect(sess.planId).toBe(plan.id);
+    expect(plan.recordedId).toBe(sess.id);
+    expect(sess.teamId).toBe(team.id);
+    const srvSess = await pb.admin.call("GET", `/api/collections/sessions/records/${sess.id}`);
+    expect(srvSess.plan).toBe(plan.id);
+    // Verein A unverändert
+    expect((await pb.admin.call("GET", "/api/collections/sessions/records/mz1sess0001")).team).toBe(u16.id);
+    // Standard-Trainingsarten des Vereins wiederverwendet, nicht verdoppelt
+    expect(D.c.data.trainingTypes.map(x => x.name).sort()).toEqual(["Basketball", "Fitness", "Taktik", "Technik"]);
+    // Dieselbe Datei nochmals: nichts doppelt
+    await D.c.importBackup(backup);
+    await D.c.sync();
+    expect(D.c.data.teams.filter(x => x.name === "U16w")).toHaveLength(1);
+    expect(D.c.data.sessions).toHaveLength(2);
+    expect(D.c.data.players).toHaveLength(5);
+  });
+
   it("Abmelden mit ausstehenden Änderungen fragt nach; danach sind keine Daten mehr auf dem Gerät", async () => {
     A.net.state.online = false;
     A.c.update(d => ({ ...d, sessions: d.sessions.map(s => ({ ...s, note: s.note + "!" })) }));

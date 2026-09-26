@@ -183,6 +183,12 @@ Echte Server-Löschung, keine Tombstones oder Deleted-Flags – die Basis übern
   dieselben IDs und erzeugen beim Zusammenführen keine Duplikate. Alle Verweise (Kader,
   Anwesenheit, Team, Trainingsart, Halle, Planung ↔ Training) werden mit umgestellt
   (`src/sync/legacy.js`, Unit- und Integrationstests).
+- IDs sind in PocketBase global. Existiert eine ID bereits in einem Bereich, den das Konto **nicht**
+  sehen darf (z. B. ein Training, das per altem Datei-Sync auch bei einem anderen Verein/Team liegt),
+  bekommt der eigene Datensatz beim Anlegen eine neue, deterministische ID; alle Verweise im selben
+  Durchlauf und lokal werden umgestellt (Relationen und Spieler-IDs in der Anwesenheit). Ein erneutes
+  Übernehmen derselben Datei erkennt die Ersatz-ID und erzeugt keine Kopie (Integrationstest
+  „Staging-Weg“). Sichtbare vorhandene IDs werden nie umgeschlüsselt, sondern übernommen.
 
 ## Erstübernahme eines bestehenden Geräts
 
@@ -202,6 +208,11 @@ Nach der ersten Anmeldung auf einem Gerät mit eigenem Datenstand (nicht nur Bei
 4. Phase-1-Verknüpfungen (nur `plan.recordedId`) werden am Training ergänzt (`planId`).
 
 Technisch ist die Übernahme kein Sonderweg: vorbereiteter Stand + leere Basis → normaler Sync.
+
+**Empfohlene Reihenfolge im Verein:** Das Gerät mit dem vollständigsten Stand übernimmt zuerst
+(bei TV Bretten: Florians iPhone). Danach erhalten Co-Trainer:innen Zugriff auf das Team und wählen
+auf ihren alten Geräten *Serverstand verwenden* (bzw. *Zusammenführen*, falls sie Trainings haben,
+die nur bei ihnen liegen). So entstehen keine parallelen Teams gleichen Inhalts.
 
 **Wichtig für Staging:** Die Staging-Domain ist eine andere Origin als GitHub Pages; der Browser gibt
 die Pages-Daten dort nicht heraus. Weg: in der Pages-App *Einstellungen → Backup herunterladen*, in
@@ -264,7 +275,7 @@ scripts/pb-admin.mjs          Verein/Abteilung/Konten/Teams/Zugriffe anlegen (Su
 | Ebene | Wo | Inhalt |
 | --- | --- | --- |
 | Unit | `src/**/*.test.js` (`npm test`) | Abbildung, Dreiwege-Abgleich, Konflikte, Löschen, Sicherheitsbremse, Rebase, ID-Migration, Übernahme, lokaler Modus, alle Phase-2-Tests |
-| Integration | `test/integration` (`npm run test:integration`) | echte PocketBase mit den Migrationen: Rechte (10 Tests) und Abläufe (19 Tests): Login/Logout, Erstübernahme, zweites Gerät, Server → lokal, lokal → Server, Planung, Training, Verknüpfung, Löschen, Offline-Phase und App-Neustart offline, Konflikte, zwei Trainer mit unterschiedlichen Rechten, Rechteentzug, Server nicht erreichbar, Zusammenführen ohne Duplikate, Abmelden |
+| Integration | `test/integration` (`npm run test:integration`) | echte PocketBase mit den Migrationen: Rechte (10 Tests) und Abläufe (20 Tests): Login/Logout, Erstübernahme, zweites Gerät, Server → lokal, lokal → Server, Planung, Training, Verknüpfung, Löschen, Offline-Phase und App-Neustart offline, Konflikte, zwei Trainer mit unterschiedlichen Rechten, Rechteentzug, Server nicht erreichbar, Zusammenführen ohne Duplikate, Abmelden |
 | Browser | `e2e/phase3.e2e.mjs` gegen den Docker-Stack | Ablauf aus dem Auftrag (Punkt 48) inkl. Service-Worker-Offline-Start, 17 Prüfungen |
 | Stack | CI-Job `docker` | Images, Health, gesperrtes Dashboard, Manifest-MIME, Backup |
 

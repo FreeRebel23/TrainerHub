@@ -11,9 +11,9 @@
 import { loadData, persist } from "../lib/data.js";
 import { clearDraft } from "../lib/draft.js";
 import { createClient, SyncError } from "./client.js";
-import { toServerSets, fromServerSets, fieldsToLocal, localToFields, BY_NAME, PUSH_ORDER } from "./mapping.js";
+import { toServerSets, fromServerSets, fieldsToLocal, localToFields, BY_NAME, PUSH_ORDER, COLLECTIONS } from "./mapping.js";
 import { pendingChanges, rebase } from "./engine.js";
-import { runSync, pullAll } from "./runner.js";
+import { runSync, pullAll, rekeyId } from "./runner.js";
 import { loadMeta, saveMeta, loadBase, saveBase, clearSync, emptyMeta } from "./store.js";
 import { hasLocalContent, prepareUpload, summarize, EMPTY_DATA } from "./legacy.js";
 
@@ -201,9 +201,12 @@ export class SyncController {
     const current = this.data;
     const info = await this.inspectMigration(imp);
     const prepared = prepareUpload(imp, { userId: this.meta.user.id, server: info.serverData });
+    // Bereits vorhanden – auch unter einer beim Sync vergebenen Ersatz-ID (siehe runner.js)
     const add = (list) => {
+      const coll = COLLECTIONS.find(c => c.local === list).name;
       const have = new Set((current[list] ?? []).map(x => x.id));
-      return [...(current[list] ?? []), ...(prepared.data[list] ?? []).filter(x => !have.has(x.id))];
+      return [...(current[list] ?? []), ...(prepared.data[list] ?? [])
+        .filter(x => !have.has(x.id) && !have.has(rekeyId(this.meta.user.id, coll, x.id)))];
     };
     this.update(d => ({ ...d, ...Object.fromEntries(["players", "teams", "trainingTypes", "venues", "seasons", "plannedSessions", "sessions"].map(l => [l, add(l)])) }));
     return summarize(prepared.data);
