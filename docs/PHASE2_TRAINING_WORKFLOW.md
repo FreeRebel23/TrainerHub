@@ -127,3 +127,27 @@ gefüllt = durchgeführt (abgeleitet aus den Daten, nie gespeichert).
 6. Import (Kopfzeilen-Erkennung, Notiz/Uhrzeit/Schwerpunkt/Themen optional), Trainingsbuch-Export,
    Druck der Planung
 7. Abnahme: Browser, Breakpoints, PWA/Offline, Kompatibilität
+
+## Unabhängiges Review vor dem Merge (Hardening)
+
+Zweites Review der Phase-2-Änderungen gegenüber Phase 1 mit Fokus auf Datenintegrität. Gefunden
+und behoben (jeweils im Browser gegen den unveränderten Stand reproduziert):
+
+- **Doppeltipp auf „Training abschließen“** speicherte das Training zweimal, verknüpfte die Planung
+  mit dem zweiten und verließ über zwei Verlaufssprünge die App. Jetzt: feste Trainings-ID je Ablauf,
+  Sperre gegen Mehrfachspeichern, `recordSession()` ist idempotent und überschreibt keine bestehende
+  Verknüpfung. Eine bereits durchgeführte Planung lässt sich (z. B. über einen alten Verlaufseintrag)
+  nicht erneut erfassen.
+- **Entwurf:** Der in Schritt 1 gewählte Rahmen (z. B. Datum eines nachgetragenen Trainings) ging bei
+  einem App-Abbruch in Schritt 2 verloren – das Training wurde dann still mit dem heutigen Datum
+  gespeichert. „Verwerfen“ legte sofort einen neuen, leeren Entwurf an und setzte die Anwesenheit ggf.
+  für das falsche Team zurück.
+- **Übungs-IDs** konnten beim Duplizieren vieler Übungen in derselben Millisekunde kollidieren
+  (≈ 0,35 % bei 15 Übungen); Abhaken/Entfernen traf dann beide. `uid()` hat jetzt 8 Zufallszeichen.
+- **Saisonübersicht:** „Wurf“ und „wurf“ wurden als zwei Themen gezählt; eigene Themen übernehmen die
+  bekannte Schreibweise.
+- **Suche** stürzte bei nicht-textuellen Feldern in unvollständigen Altdaten ab.
+- **Planen ohne Team** endete in einem stummen Speichern-Button; jetzt Hinweis mit Weg zu den Teams.
+
+Die Fachlogik für Abschließen/Löschen (`recordSession`, `removeSession`) liegt jetzt in
+`src/lib/training.js` und ist mit Tests abgesichert.
