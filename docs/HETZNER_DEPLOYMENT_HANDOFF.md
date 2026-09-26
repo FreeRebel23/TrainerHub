@@ -215,12 +215,18 @@ durchgeführt: beide Formate, alle Collections identisch.
    ```bash
    export PB_URL=http://127.0.0.1:18091 PB_SUPERUSER_EMAIL=<mail>; read -rs PB_SUPERUSER_PASSWORD; export PB_SUPERUSER_PASSWORD
    node scripts/pb-admin.mjs bootstrap --org "TV Bretten" --section Basketball
-   node scripts/pb-admin.mjs user --email <florian> --name Florian --org-admin      # gibt Startpasswort einmalig aus
-   node scripts/pb-admin.mjs user --email <co-trainer> --name "…"
-   # Teams entstehen beim ersten Upload; danach Zugriff geben:
-   node scripts/pb-admin.mjs grant --email <co-trainer> --team U16w
+   node scripts/pb-admin.mjs user --email <trainer> --name "…"          # Konto + Vereinszugehörigkeit, gibt Startpasswort einmalig aus
+   node scripts/pb-admin.mjs user --email <admin-konto> --name "…"
+   node scripts/pb-admin.mjs permit --email <admin-konto> --profile organisation_admin --scope "TV Bretten"
+   node scripts/pb-admin.mjs permit --email <leitung> --profile section_manager --scope Basketball --org "TV Bretten" --function "Abteilungsleiter"
+   # Teams legen Leitung/Admin an (nie coaches); Namen exakt wie in der App:
+   node scripts/pb-admin.mjs team --section Basketball --name U16w --org "TV Bretten" --coach <trainer>
+   node scripts/pb-admin.mjs permit --email <co-trainer> --profile coach --scope U16w --org "TV Bretten" --function "Co-Trainer"
+   node scripts/pb-admin.mjs permissions            # je Person: Profile, Scopes, Funktionen
    node scripts/pb-admin.mjs overview
    ```
+   Profile: `organisation_admin` (Verein) · `section_manager` (Abteilung) · `coach` (Team), beliebig
+   kombinierbar; `unpermit` entzieht. Funktionen (`--function`) sind nur Bezeichnungen, keine Rechte.
    (Node 22 lokal oder auf dem Server; alternativ alles im Dashboard.)
 9. Reverse Proxy anbinden (Schritt 6), Konfiguration testen und neu laden – nur die neue Site.
 10. Backup-Cron und Kopie außer Haus einrichten (Schritt 8), Restore-Probe durchführen.
@@ -287,9 +293,10 @@ von Staging durch die lokale Claude-Code-Session mit SSH-Zugang.
 4. **Superuser-API war über die öffentliche Domain erreichbar** (nur `/_/` war gesperrt): im
    Caddy-Block `/api/collections/_superusers*` → 404. Verwaltung weiter per SSH-Tunnel auf 18091.
    Empfehlung: dieselbe Sperre auch in `deploy/web/nginx.conf` aufnehmen.
-5. **Teams vor der Datenübernahme anlegen:** Ein reines Trainer-Konto ohne Team hat keinen
-   Abteilungszugriff und darf keine Teams anlegen. Teams deshalb per `pb-admin.mjs team … --trainer`
-   vorab anlegen – mit **exakt** den Namen aus der App, damit „Backup übernehmen“ zusammenführt.
+5. **Teams vor der Datenübernahme anlegen:** Teams legen nur `section_manager`/`organisation_admin` an
+   (seit Migration `1760000200` ausdrücklich so gewollt, nicht nur Nebeneffekt). Teams deshalb per
+   `pb-admin.mjs team … --coach` vorab anlegen – mit **exakt** den Namen aus der App, damit
+   „Backup übernehmen“ zusammenführt.
 6. `install -d -o 10001` scheitert ohne Host-Nutzer 10001 → `mkdir` + `chown 10001:10001`
    (Anleitung oben korrigiert).
 7. Keine Kopie außer Haus möglich, solange kein externes Ziel existiert (offen, siehe unten).

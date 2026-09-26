@@ -73,11 +73,55 @@ Entscheidungen:
   (UTC), damit kein Training durch Zeitzonen verrutscht (Lehre aus Phase 1).
 - **Unbekannte Felder** gehen nicht verloren: alles, was das Schema nicht kennt, landet in `extra`
   und kommt unverändert zurück.
-- **Rollen:** nur dort, wo sie sich unterscheiden: Vereins-Admin (alles im Verein, Löschen von
-  Stammdaten, Trainer:innen zuordnen), Abteilungsleitung (alles in der Abteilung), Trainer:in
-  (eigene Teams). „Co-Trainer“ hat heute keine anderen Rechte als Trainer:in und ist daher keine Rolle.
-- **Vereins-Admins sehen alle Teams des Vereins** (auch andere Abteilungen). Wer im Alltag nur die
-  eigenen Teams sehen möchte, wird Trainer:in dieser Teams statt Admin.
+- **Berechtigungen:** drei technische Profile mit Scope, siehe nächster Abschnitt. Eine Person kann
+  beliebig viele parallel besitzen.
+
+## Berechtigungen: Funktion ≠ Berechtigung
+
+**Funktion beschreibt den Menschen. Berechtigung beschreibt, was TrainerHub erlaubt.**
+
+| | Beispiele | Wirkung |
+| --- | --- | --- |
+| **Organisatorische Funktion** | Vereinsvorstand, Abteilungsleiter, stellv. Abteilungsleiter, Sportliche Leitung, Trainer, Co-Trainer | nur Bezeichnung/Anzeige (Feld `functions`), **nie** Grundlage einer Regel |
+| **Technische Berechtigung** | `organisation_admin`, `section_manager`, `coach` | allein maßgeblich für die serverseitigen Rechte |
+
+Zwei Funktionen mit denselben Rechten nutzen dasselbe Profil (Sportliche Leitung und Abteilungsleiter →
+`section_manager`; Trainer und Co-Trainer → `coach`). Es gibt bewusst keine weiteren technischen
+Rollen (`head_coach`, `department_leader` …), solange daraus keine anderen Rechte entstehen.
+
+### Die drei Profile
+
+| Profil | Scope | gespeichert als | darf |
+| --- | --- | --- | --- |
+| `organisation_admin` | ein Verein | `organizations.admins` | alle Abteilungen/Teams des Vereins sehen und verwalten, Abteilungen anlegen/ändern/löschen, Leitungen und coaches zuordnen, Verein bearbeiten (Mitglieder, Admins, Funktionen), Stammdaten löschen |
+| `section_manager` | eine Abteilung | `sections.managers` | alle Teams und sportlichen Daten der Abteilung sehen und bearbeiten, Teams anlegen/ändern/löschen (leere), coaches zuordnen, Stammdaten der Abteilung (Trainingsarten, Spieler:innen) verwalten |
+| `coach` | ein Team | `teams.trainers` | im Team: Spieler:innen/Kader, Saisons, Planungen, Trainings, Anwesenheit, Historie, Auswertung; Teamname ändern. **Keine** Teams anlegen, keine Zuordnungen, keine Funktionen |
+
+- **Permission = Benutzer + Profil + Scope.** Technisch ist der Scope der Datensatz, an dessen
+  Relation das Konto hängt (Verein, Abteilung bzw. Team). Keine eigene Berechtigungs-Collection und
+  keine generische ACL: Die Relationen existieren ohnehin für die Hierarchie, die Regeln bleiben lesbar,
+  und der Sync muss nichts über Rollen wissen.
+- **Mehrere Berechtigungen:** Jede Relation ist unabhängig; die Regeln verknüpfen die Profile mit
+  ODER. Rechte addieren sich daher je Scope und schränken sich nie gegenseitig ein. Beispiel:
+  `section_manager` Handball + `coach` U16w (Basketball) → sieht Handball vollständig und U16w, darf in
+  Handball Teams anlegen, in Basketball nicht, und in U16w keine coaches zuordnen.
+- **Hierarchie:** Ein Profil auf größerem Scope umfasst die kleineren (Admin ⊃ Abteilung ⊃ Team).
+  Nichts gilt über den Scope hinaus: kein Recht in einer anderen Abteilung oder einem anderen Verein.
+- **Zugehörigkeit (`organizations.members`)** ist kein Profil: Sie bedeutet nur „gehört zum Verein
+  und kann berechtigt werden“ und erlaubt allein das Lesen des Vereinsdatensatzes. Ein Hook
+  (`pocketbase/pb_hooks/permissions.pb.js`) erzwingt, dass `section_manager` und `coach` Mitglied des
+  Vereins sind (kein Konto eines fremden Vereins kann zugeordnet werden); `organisation_admin` wird
+  automatisch Mitglied.
+- **Funktionen** stehen je Scope in `functions` (JSON `{ userId: "Bezeichnung" }`) an Verein,
+  Abteilung bzw. Team. Ändern: Verein/Abteilung → `organisation_admin`, Team → Leitung/Admin.
+- **`organisation_admin` ist keine Serveradministration.** Der PocketBase-Superuser (Dashboard,
+  Konten anlegen, Backups) ist getrennt; ein Vereins-Admin hat keinen Zugriff auf `_superusers` und
+  legt keine Konten an. Konten entstehen bis auf Weiteres per `scripts/pb-admin.mjs` (Superuser).
+- **Admins sehen alle Teams des Vereins.** Wer im Alltag nur die eigenen Teams sehen möchte, nutzt ein
+  Konto mit `coach` und für Verwaltung ein getrenntes Konto (so auf Staging eingerichtet).
+- **Anzeige in der App:** `src/sync/permissions.js` leitet die Profile aus den sichtbaren
+  Datensätzen ab (nur für die Oberfläche, z. B. „Team anlegen“ nur für Leitung/Admin). Entschieden
+  wird ausschließlich serverseitig.
 
 ## Zugriffsregeln (serverseitig)
 
@@ -86,23 +130,29 @@ mit `@request.auth.id != ""` – ohne diese Klammer trifft in PocketBase `leeres
 @request.auth.id` bei anonymen Anfragen zu (gefunden durch die Integrationstests: Teams ohne
 Abteilungsleitung waren anonym lesbar).
 
+Regeln seit `pocketbase/pb_migrations/1760000200_permission_profiles.js` (Grundlage `1760000000`):
+
 | Collection | list / view | create | update | delete |
 | --- | --- | --- | --- | --- |
-| organizations | Mitglied/Admin | – (Superuser) | – | – |
-| sections | Mitglied des Vereins | – | – | – |
-| teams | Team-Zugriff¹ | Abteilungszugriff², nur mit sich selbst als einzige:r Trainer:in | Team-Zugriff; `trainers` nur Admin/Leitung; Abteilung nicht änderbar | Vereins-Admin |
-| players | Abteilungszugriff² | Abteilungszugriff | Abteilungszugriff, Abteilung nicht änderbar | Vereins-Admin |
+| organizations | Mitglied (Zugehörigkeit) oder Admin | – (Superuser) | `organisation_admin` | – |
+| sections | Leitung, Admin, coach eines Teams darin | `organisation_admin` des Vereins | `organisation_admin`; Verein nicht änderbar | `organisation_admin` |
+| teams | Team-Zugriff¹ | Leitung der Abteilung / Admin | Team-Zugriff; `trainers` und `functions` nur Leitung/Admin; Abteilung nicht änderbar | Leitung/Admin (nur leere Teams) |
+| players | Abteilungszugriff² | Abteilungszugriff | Abteilungszugriff, Abteilung nicht änderbar | Leitung/Admin |
 | training_types | Abteilungszugriff | Abteilungszugriff | dto. | Leitung/Admin |
-| venues | Vereinsmitglied | Vereinsmitglied | dto., Verein nicht änderbar | Vereins-Admin |
+| venues | ein Profil im Verein³ | ein Profil im Verein | dto., Verein nicht änderbar | `organisation_admin` |
 | seasons, plans, sessions | Team-Zugriff | Team-Zugriff auf das Ziel-Team | Team-Zugriff; Verschieben nur in Teams mit Zugriff | Team-Zugriff |
 | users | nur sich selbst | – (keine Selbstregistrierung) | sich selbst | – |
 
-¹ Trainer:in des Teams, Leitung der Abteilung oder Admin des Vereins.
-² Leitung, Vereins-Admin oder Trainer:in eines Teams in dieser Abteilung.
+¹ `coach` des Teams, `section_manager` der Abteilung oder `organisation_admin` des Vereins.
+² `section_manager`, `organisation_admin` oder `coach` eines Teams in dieser Abteilung.
+³ `organisation_admin` des Vereins, `section_manager` einer Abteilung oder `coach` eines Teams darin.
 
 Ein fremder Datensatz antwortet mit 404 (nicht 403) – seine Existenz wird nicht verraten.
 Abgesichert in `test/integration/access.test.js` (10 Tests, u. a. anonym in allen Collections,
-Filter-Tricks, Verschieben, fremder Verein, andere Abteilung).
+Filter-Tricks, Verschieben, fremder Verein, andere Abteilung) und `test/integration/permissions.test.js`
+(14 Tests: je Profil sehen/verwalten/nicht dürfen, Mehrfachberechtigung, Mitglied ohne Profil,
+Funktionen ohne Rechte, fremdes Konto nicht zuordenbar, kein Datensatz eines anderen Vereins über
+irgendeine Collection, Admin ≠ Superuser).
 
 ## Anmeldung
 
@@ -215,6 +265,12 @@ Nach der ersten Anmeldung auf einem Gerät mit eigenem Datenstand (nicht nur Bei
 
 Technisch ist die Übernahme kein Sonderweg: vorbereiteter Stand + leere Basis → normaler Sync.
 
+**Teams zuerst anlegen:** Neue Teams legen nur `section_manager` bzw. `organisation_admin` an. Vor der
+Übernahme eines Geräts eines reinen `coach` müssen dessen Teams daher existieren und zugeordnet sein
+(`pb-admin.mjs team … --coach …`), mit **exakt** den Namen aus der App – dann führt die Übernahme sie
+zusammen. Nicht vorhandene Teams (samt deren Trainings) lehnt der Server ab; sie erscheinen als nicht
+übertragene Einträge und bleiben auf dem Gerät.
+
 **Empfohlene Reihenfolge im Verein:** Das Gerät mit dem vollständigsten Stand übernimmt zuerst
 (bei TV Bretten: Florians iPhone). Danach erhalten Co-Trainer:innen Zugriff auf das Team und wählen
 auf ihren alten Geräten *Serverstand verwenden* (bzw. *Zusammenführen*, falls sie Trainings haben,
@@ -245,7 +301,7 @@ deploy/web/nginx.conf         PWA (MIME, Cache-Header, SPA-Fallback), /api → P
 deploy/compose.yaml           Stack: pocketbase + web, internes Netz, ein Upstream-Port
 deploy/compose.proxy-network.yaml  optional: web in ein bestehendes Proxy-Netz statt Host-Port
 deploy/scripts/               deploy.sh, backup.sh, restore.sh, status.sh, inspect-server.sh (read-only)
-scripts/pb-admin.mjs          Verein/Abteilung/Konten/Teams/Zugriffe anlegen (Superuser-API)
+scripts/pb-admin.mjs          Verein/Abteilungen/Teams/Konten, Berechtigungen (permit/unpermit), Funktionen (Superuser-API)
 ```
 
 - Container sind ersetzbar; unverzichtbar ist nur `pb_data` (Bind-Mount `PB_DATA_DIR`): Datenbank,
