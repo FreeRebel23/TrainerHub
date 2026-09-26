@@ -28,7 +28,8 @@ esac
 [ -f "$SRC/data.db" ] || { echo "Keine PocketBase-Datenbank im Archiv" >&2; exit 1; }
 
 docker compose stop pocketbase >/dev/null 2>&1 || true
-if [ -d "$PB_DATA_DIR" ]; then mv "$PB_DATA_DIR" "${PB_DATA_DIR}.before-restore-${STAMP}"; fi
+PREV=""
+if [ -d "$PB_DATA_DIR" ]; then PREV="${PB_DATA_DIR}.before-restore-${STAMP}"; mv "$PB_DATA_DIR" "$PREV"; fi
 mkdir -p "$(dirname "$PB_DATA_DIR")"
 cp -a "$SRC" "$PB_DATA_DIR"
 # Container lÃ¤uft als UID 10001
@@ -37,7 +38,7 @@ chown -R 10001:10001 "$PB_DATA_DIR" 2>/dev/null || echo "Hinweis: chown nicht mÃ
 docker compose up -d pocketbase >/dev/null
 for i in $(seq 1 30); do
   if docker compose exec -T pocketbase wget -q -O /dev/null http://127.0.0.1:8090/api/health 2>/dev/null; then
-    echo "Wiederhergestellt aus $ARCHIVE. Vorheriger Stand: ${PB_DATA_DIR}.before-restore-${STAMP}"
+    echo "Wiederhergestellt aus $ARCHIVE.${PREV:+ Vorheriger Stand: $PREV}"
     exit 0
   fi
   sleep 1

@@ -1,0 +1,46 @@
+name: Deploy Staging (Hetzner)
+
+# Nur Staging. Die GitHub-Pages-Produktion wird hier nie berührt (die deployt nur aus main).
+# Voraussetzungen (siehe docs/HETZNER_DEPLOYMENT_HANDOFF.md):
+#   Repository-Variable STAGING_DEPLOY_ENABLED=true (sonst wird nichts deployt)
+#   Environment "staging" mit Secrets STAGING_SSH_HOST, STAGING_SSH_USER, STAGING_SSH_KEY,
+#   STAGING_SSH_KNOWN_HOSTS und Variable STAGING_DIR (Checkout-Verzeichnis auf dem Server).
+# Das Repository ist öffentlich: Logs enthalten bewusst keine Serverdetails.
+on:
+  push:
+    branches: [trainerhub-phase3]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: checks
+    if: vars.STAGING_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: SSH vorbereiten
+        env:
+          KEY: ${{ secrets.STAGING_SSH_KEY }}
+          KNOWN: ${{ secrets.STAGING_SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$KNOWN" > ~/.ssh/known_hosts
+      - name: Deploy (Backup → Build → Start → Health)
+        env:
+          HOST: ${{ secrets.STAGING_SSH_HOST }}
+          USER: ${{ secrets.STAGING_SSH_USER }}
+          DIR: ${{ vars.STAGING_DIR }}
+        run: |
+          ssh -i ~/.ssh/id_deploy -o BatchMode=yes "$USER@$HOST" \
+            "cd '$DIR' && git fetch --quiet origin '${{ github.ref_name }}' && git checkout --quiet --detach '${{ github.sha }}' && ./deploy/scripts/deploy.sh"

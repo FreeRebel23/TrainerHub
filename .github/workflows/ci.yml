@@ -1,0 +1,60 @@
+name: CI
+
+# Prüft jeden Push und Pull Request: Lint, Unit-Tests, Integrationstests gegen eine echte
+# PocketBase (Version aus pocketbase/version.json), Production-Build und Docker-Images.
+# Wird vom Staging-Deploy wiederverwendet – kein Deployment bei roten Checks.
+on:
+  push:
+    branches-ignore: [main]      # main prüft der Pages-Workflow selbst
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - name: PocketBase (fest gepinnt, Prüfsumme)
+        run: npm run pb:fetch
+      - run: npm run test:integration
+      - run: npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - name: Images bauen (ohne Push)
+        run: |
+          docker build -f pocketbase/Dockerfile -t trainerhub-pocketbase:ci .
+          docker build -f deploy/web/Dockerfile -t trainerhub-web:ci .
+      - name: Stack starten und prüfen
+        working-directory: deploy
+        run: |
+          cat > .env <<ENV
+          COMPOSE_PROJECT_NAME=trainerhub-ci
+          TRAINERHUB_PUBLIC_URL=http://127.0.0.1:18090
+          WEB_BIND=127.0.0.1:18090
+          PB_ADMIN_BIND=127.0.0.1:18091
+          PB_DATA_DIR=./data/pb_data
+          PB_ENCRYPTION_KEY=$(openssl rand -hex 16)
+          TRAINERHUB_IMAGE_TAG=ci
+          ENV
+          sudo install -d -o 10001 -g 10001 data/pb_data
+          docker compose up -d --no-build --wait --wait-timeout 90
+          curl -fsS http://127.0.0.1:18090/healthz
+          curl -fsS http://127.0.0.1:18090/api/health
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18090/_/)" = 404
+          curl -fsSI http://127.0.0.1:18090/manifest.webmanifest | grep -i 'application/manifest+json'
+          sudo ./scripts/backup.sh
+          docker compose down -v

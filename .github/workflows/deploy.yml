@@ -25,6 +25,12 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Kein Deployment bei roten Checks (Backlog Phase 1: „Lint/Tests vor dem Deploy“)
+      - run: npm run lint
+      - run: npm test
+      - run: npm run pb:fetch
+      - run: npm run test:integration
+      # Ohne VITE_SYNC_SERVER: rein lokale PWA wie bisher (kein Server, kein Login)
       - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

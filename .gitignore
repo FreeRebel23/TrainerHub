@@ -7,3 +7,6 @@ dev-dist
 .env
 deploy/.env
 pb_data
+deploy/data
+deploy/backups
+e2e-output
