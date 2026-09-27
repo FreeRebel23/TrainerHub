@@ -335,6 +335,17 @@ von Staging durch die lokale Claude-Code-Session mit SSH-Zugang.
 - Befehle: `cd /opt/trainerhub-staging/deploy && sudo docker compose --profile sports run --rm -T sports-sync status|run …`
   (siehe `docs/SPORTS_DATA_ARCHITECTURE.md` §18).
 
+### Stand Phase 4 (27.09.2026)
+
+- Staging läuft auf `trainerhub-phase4-team-workspace` @ `12b86bd` (Migration `1760000400_team_workspace`,
+  additiv). Vor dem Update Backup durch `deploy.sh`. Rückweg: `git checkout f2953fd && ./scripts/deploy.sh`
+  und `migrate down` (entfernt Saisonkader/Beobachtungen, siehe `docs/PHASE4_TEAM_WORKSPACE.md` §15).
+- TV Bretten › Basketball: **U16w** und neu **U14w** (leer, gleiche Trainer-Zuordnung wie U16w). Keine
+  Personen, Saisons oder Trainings – reale Daten werden bewusst über die UI erfasst.
+- Browser-E2E Phase 4 (`e2e/phase4.e2e.mjs`, 23/23) lief über HTTPS gegen Staging in einem eigenen
+  Test-Mandanten „TV Phase4“ mit erfundenen Personen; Test-Mandant, Testkonten und der temporäre
+  Superuser wurden danach gelöscht.
+
 ### Angelegte Struktur und Berechtigungen (ohne Zugangsdaten)
 
 Stand nach Migration `1760000200_permission_profiles` (Staging-Update auf `5ef9ce7`, 26.09.2026):
