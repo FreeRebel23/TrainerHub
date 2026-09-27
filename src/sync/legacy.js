@@ -4,30 +4,16 @@
 // überschrieben, sondern übernommen – so entstehen keine Duplikate.
 
 import { INIT } from "../lib/constants.js";
+import { stableId } from "../lib/ids.js";
 
 // Server-IDs: 10–40 Zeichen [a-z0-9]. Phase-1/2-IDs (Zeitstempel + Zufall) erfüllen das fast
 // immer; Start-IDs wie "t0", "p1", "tt1" nicht – und wären zwischen Vereinen nicht eindeutig.
 export const VALID_ID = /^[a-z0-9]{10,40}$/;
 
-// Deterministischer Hash (cyrb53) → gleiche Ausgangsdaten eines Benutzers ergeben auf jedem
-// Gerät dieselben neuen IDs; ein zweites Gerät mit derselben Herkunft erzeugt keine Duplikate.
-function cyrb53(str, seed = 0) {
-  let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
-  for (let i = 0; i < str.length; i++) {
-    const ch = str.charCodeAt(i);
-    h1 = Math.imul(h1 ^ ch, 2654435761);
-    h2 = Math.imul(h2 ^ ch, 1597334677);
-  }
-  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
-}
-export function stableId(...parts) {
-  const s = parts.join("\u0000");
-  return ("m" + cyrb53(s, 1).toString(36) + cyrb53(s, 2).toString(36)).slice(0, 24);
-}
+// Deterministische IDs (gleiche Ausgangsdaten → auf jedem Gerät dieselbe ID), siehe lib/ids.js
+export { stableId };
 
-const LISTS = ["players", "teams", "trainingTypes", "venues", "seasons", "plannedSessions", "sessions"];
+const LISTS = ["players", "teams", "trainingTypes", "venues", "seasons", "plannedSessions", "sessions", "rosterEntries", "observations"];
 const clone = v => JSON.parse(JSON.stringify(v));
 
 // Ersetzt ungültige IDs überall – inkl. aller Verweise. salt = Benutzer-ID.
@@ -55,6 +41,14 @@ export function migrateIds(data, salt) {
     if (s.planId) s.planId = m("plannedSessions", s.planId);
   });
   (d.plannedSessions ?? []).forEach(p => { if (p.recordedId) p.recordedId = m("sessions", p.recordedId); });
+  (d.rosterEntries ?? []).forEach(r => {
+    r.seasonId = m("seasons", r.seasonId); r.teamId = m("teams", r.teamId); r.playerId = m("players", r.playerId);
+  });
+  (d.observations ?? []).forEach(o => {
+    o.teamId = m("teams", o.teamId); o.playerId = m("players", o.playerId);
+    if (o.sessionId) o.sessionId = m("sessions", o.sessionId);
+    if (o.planId) o.planId = m("plannedSessions", o.planId);
+  });
   const changed = LISTS.reduce((n, l) => n + maps[l].size, 0);
   return { data: d, changed };
 }
@@ -90,6 +84,7 @@ export function summarize(data) {
     sessions: (data?.sessions ?? []).length,
     plans: (data?.plannedSessions ?? []).length,
     seasons: (data?.seasons ?? []).length,
+    observations: (data?.observations ?? []).length,
     trainingTypes: (data?.trainingTypes ?? []).length,
     venues: (data?.venues ?? []).length,
   };
@@ -134,6 +129,8 @@ export function matchToServer(data, server) {
     if (x.venueId) x.venueId = m("venues", x.venueId);
   }));
   (d.sessions ?? []).forEach(s => { s.attendance = (s.attendance ?? []).map(a => ({ ...a, playerId: m("players", a.playerId) })); });
+  (d.rosterEntries ?? []).forEach(r => { r.teamId = m("teams", r.teamId); r.playerId = m("players", r.playerId); });
+  (d.observations ?? []).forEach(o => { o.teamId = m("teams", o.teamId); o.playerId = m("players", o.playerId); });
   return { data: d, matched };
 }
 
@@ -147,5 +144,6 @@ export function prepareUpload(data, { userId, server = null }) {
 
 export const EMPTY_DATA = () => ({
   players: [], teams: [], trainingTypes: [], venues: [], sessions: [], plannedSessions: [], seasons: [],
+  rosterEntries: [], observations: [], competitions: [], externalGames: [],
   settings: { trainerName: "" },
 });

@@ -12,7 +12,7 @@
 //    Auf dem Server gelöscht → lokal entfernen; ungesicherte lokale Änderungen landen im
 //    Konfliktprotokoll.
 
-import { COLLECTIONS, BY_NAME, PUSH_ORDER, same } from "./mapping.js";
+import { COLLECTIONS, BY_NAME, PUSH_ORDER, same, isReadOnly } from "./mapping.js";
 
 const emptySets = () => Object.fromEntries(PUSH_ORDER.map(n => [n, new Map()]));
 
@@ -22,6 +22,7 @@ export function sanitizeRelations(local, remote) {
   const known = n => id => local[n]?.has(id) || remote?.[n]?.has(id);
   PUSH_ORDER.forEach(name => {
     const spec = BY_NAME[name];
+    if (spec.readOnly) return;                                 // wird nie übertragen
     const rels = spec.fields.filter(([, , t]) => t === "rel" || t === "rels");
     if (!rels.length) return;
     local[name].forEach((f, id) => {
@@ -41,6 +42,7 @@ export function sanitizeRelations(local, remote) {
 export function pendingChanges(local, base) {
   const out = [];
   PUSH_ORDER.forEach(name => {
+    if (isReadOnly(name)) return;
     const b = base[name] ?? {};
     local[name].forEach((f, id) => {
       if (!b[id]) out.push({ coll: name, id, type: "create" });
@@ -80,6 +82,10 @@ export function reconcile(local, base, remote, { now = new Date().toISOString(),
 
   PUSH_ORDER.forEach(name => {
     const L = local[name] ?? new Map(), B = base[name] ?? {}, R = remote[name] ?? new Map();
+    if (isReadOnly(name)) {                                      // Serverstand gilt, keine Operationen
+      R.forEach((r, id) => { result[name].set(id, r.f); nextBase[name][id] = r; });
+      return;
+    }
     const ids = new Set([...L.keys(), ...Object.keys(B), ...R.keys()]);
     ids.forEach(id => {
       const l = L.get(id), b = B[id], r = R.get(id);

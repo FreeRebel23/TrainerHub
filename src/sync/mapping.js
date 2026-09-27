@@ -8,6 +8,8 @@
 // type: text | num | numOrNull | bool | json | rel | rels
 // local: Feldname im lokalen Objekt, server: Feldname in PocketBase
 // scope: Pflicht-Zuordnung zu Verein/Abteilung, die bei neuen Einträgen aus dem Kontext kommt
+// readOnly: nur herunterladen (serverseitig befüllt, z. B. Spiele aus dem Sports-Data-Adapter);
+//           lokale Änderungen werden nie übertragen, der Serverstand gilt immer
 export const COLLECTIONS = [
   { name: "venues", local: "venues", scope: { local: "organizationId", server: "organization", ctx: "organizationId" },
     fields: [["name", "name", "text"], ["address", "address", "text"]] },
@@ -19,7 +21,7 @@ export const COLLECTIONS = [
     fields: [["name", "name", "text"], ["playerIds", "players", "rels", "players"]] },
   { name: "seasons", local: "seasons",
     fields: [["teamId", "team", "rel", "teams"], ["name", "name", "text"], ["startDate", "startDate", "text"],
-      ["endDate", "endDate", "text"], ["phase", "phase", "text"], ["gamedays", "gamedays", "json"]] },
+      ["endDate", "endDate", "text"], ["phase", "phase", "text"], ["gamedays", "gamedays", "json"], ["goals", "goals", "json"]] },
   { name: "plans", local: "plannedSessions", derived: ["recordedId"],
     fields: [["teamId", "team", "rel", "teams"], ["date", "date", "text"], ["time", "time", "text"],
       ["trainingTypeId", "trainingType", "rel", "training_types"], ["venueId", "venue", "rel", "venues"],
@@ -31,11 +33,32 @@ export const COLLECTIONS = [
       ["durationMinutes", "durationMinutes", "num"], ["factor", "factor", "num"], ["attendance", "attendance", "json"],
       ["checklist", "checklist", "json"], ["focus", "focus", "text"], ["tags", "tags", "json"], ["note", "note", "text"],
       ["erfasstVon", "recordedBy", "text"]] },
+  // Phase 4: Saisonkader (Person ↔ Team ↔ Saison) und Trainerbeobachtungen
+  { name: "roster_entries", local: "rosterEntries",
+    fields: [["seasonId", "season", "rel", "seasons"], ["teamId", "team", "rel", "teams"], ["playerId", "player", "rel", "players"],
+      ["jerseyNumber", "jerseyNumber", "text"], ["position", "position", "text"], ["status", "status", "text"]] },
+  { name: "observations", local: "observations",
+    fields: [["teamId", "team", "rel", "teams"], ["playerId", "player", "rel", "players"], ["date", "date", "text"],
+      ["sessionId", "session", "rel", "sessions"], ["planId", "plan", "rel", "plans"], ["gameRef", "gameRef", "text"],
+      ["text", "text", "text"], ["tags", "tags", "json"], ["createdBy", "createdBy", "text"], ["authorName", "authorName", "text"],
+      ["capturedAt", "capturedAt", "text"]] },
+  // Spiele aus dem Sports-Data-Adapter (optional; ohne Integration einfach leer). TrainerHub liest nur
+  // die bereits normalisierten Datensätze seines Stores – keine Provider-Logik im Client.
+  { name: "competitions", local: "competitions", readOnly: true,
+    fields: [["name", "name", "text"], ["seasonName", "seasonName", "text"]] },
+  { name: "games", local: "externalGames", readOnly: true,
+    fields: [["competitionId", "competition", "rel", "competitions"], ["homeTeamId", "homeTeam", "rel", "teams"],
+      ["awayTeamId", "awayTeam", "rel", "teams"], ["date", "date", "text"], ["time", "time", "text"],
+      ["previousDate", "previousDate", "text"], ["homeTeamName", "homeTeamName", "text"], ["awayTeamName", "awayTeamName", "text"],
+      ["homeScore", "homeScore", "num"], ["awayScore", "awayScore", "num"], ["status", "status", "text"],
+      ["forfeit", "forfeit", "bool"], ["periods", "periods", "json"], ["venue", "venue", "text"],
+      ["missingCount", "missingCount", "num"], ["provider", "provider", "text"]] },
 ];
 
 export const BY_NAME = Object.fromEntries(COLLECTIONS.map(c => [c.name, c]));
 // Reihenfolge beim Anlegen/Ändern (Abhängigkeiten zuerst); Löschen umgekehrt
 export const PUSH_ORDER = COLLECTIONS.map(c => c.name);
+export const isReadOnly = name => !!BY_NAME[name]?.readOnly;
 
 function toServerValue(type, v) {
   switch (type) {

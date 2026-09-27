@@ -136,13 +136,16 @@ export function recordSession(data, sess) {
   return next;
 }
 
-// Training löschen; eine darauf verweisende Planung gilt danach wieder als offen
+// Training löschen; eine darauf verweisende Planung gilt danach wieder als offen. Beobachtungen aus
+// diesem Training bleiben erhalten (sie gehören auch zur Person) – nur ihr Verweis entfällt.
 export function removeSession(data, id) {
-  return {
+  const next = {
     ...data,
     sessions: (data.sessions ?? []).filter(s => s.id !== id),
     plannedSessions: (data.plannedSessions ?? []).map(p => p.recordedId === id ? { ...p, recordedId: null } : p),
   };
+  if (data.observations) next.observations = data.observations.map(o => o.sessionId === id ? { ...o, sessionId: "" } : o);
+  return next;
 }
 
 // ─── Defaults für neue Planungen ───

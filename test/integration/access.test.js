@@ -57,9 +57,14 @@ describe("Mandantentrennung und Team-Rechte", () => {
     expect((await r.json()).items.map(s => s.id)).toEqual(["fremd00000000001"]);
   });
 
-  it("Spieler:innen sind abteilungsweit sichtbar, nicht abteilungs- oder vereinsübergreifend", async () => {
+  // Seit 1760000400 (Phase 4): coach sieht nur Personen seiner Teams, Leitung/Admin die Abteilung
+  it("Spieler:innen: coach nur im eigenen Team, Admin abteilungsweit, nie abteilungs- oder vereinsübergreifend", async () => {
+    expect(names(await c.coach.listAll("players"))).toEqual([]);                       // in keinem seiner Teams
+    expect(names(await c.florian.listAll("players"))).toEqual(["Basketballerin", "Handballerin"]);   // Vereins-Admin
+    await pb.admin.patch("teams", team.u14.id, { players: ["bbplayer00000001"] });
     expect(names(await c.coach.listAll("players"))).toEqual(["Basketballerin"]);
-    expect(names(await c.hand.listAll("players"))).toEqual(["Handballerin"]);
+    await pb.admin.patch("teams", team.u14.id, { players: [] });
+    expect(names(await c.hand.listAll("players"))).toEqual([]);                        // nicht in seinem Team
     expect(names(await c.other.listAll("players"))).toEqual([]);
     await expect(c.coach.create("players", { section: t.handball.id, name: "X" })).rejects.toMatchObject({ status: 400 });
   });

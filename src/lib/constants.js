@@ -54,5 +54,7 @@ export const INIT = {
   sessions: [],
   plannedSessions: [],
   seasons: [],
+  rosterEntries: [],
+  observations: [],
   settings: { trainerName: "" },
 };

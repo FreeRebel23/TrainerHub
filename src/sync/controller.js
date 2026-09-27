@@ -213,7 +213,8 @@ export class SyncController {
       return [...(current[list] ?? []), ...(prepared.data[list] ?? [])
         .filter(x => !have.has(x.id) && !have.has(rekeyId(this.meta.user.id, coll, x.id)))];
     };
-    this.update(d => ({ ...d, ...Object.fromEntries(["players", "teams", "trainingTypes", "venues", "seasons", "plannedSessions", "sessions"].map(l => [l, add(l)])) }));
+    this.update(d => ({ ...d, ...Object.fromEntries(["players", "teams", "trainingTypes", "venues", "seasons", "plannedSessions", "sessions",
+      "rosterEntries", "observations"].map(l => [l, add(l)])) }));
     return summarize(prepared.data);
   }
 
@@ -331,6 +332,8 @@ export function inSection(data, sectionId) {
     sessions: (data.sessions ?? []).filter(x => ids.has(x.teamId)),
     plannedSessions: (data.plannedSessions ?? []).filter(x => ids.has(x.teamId)),
     seasons: (data.seasons ?? []).filter(x => ids.has(x.teamId)),
+    rosterEntries: (data.rosterEntries ?? []).filter(x => ids.has(x.teamId)),
+    observations: (data.observations ?? []).filter(x => ids.has(x.teamId)),
   };
 }
 

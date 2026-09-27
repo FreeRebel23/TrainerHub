@@ -36,7 +36,7 @@ export default [
       sourceType: "script",
       globals: { migrate: "readonly", Collection: "readonly", RelationField: "readonly", routerAdd: "readonly",
         onRecordAfterUpdateSuccess: "readonly", onRecordCreateRequest: "readonly", onRecordUpdateRequest: "readonly",
-        JSONField: "readonly", BadRequestError: "readonly", require: "readonly", module: "writable", __hooks: "readonly",
+        JSONField: "readonly", BadRequestError: "readonly", Record: "readonly", require: "readonly", module: "writable", __hooks: "readonly",
         $app: "readonly", $os: "readonly" },
     },
   },

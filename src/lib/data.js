@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { INIT, STORE_KEY, STATUSES, PRESENT_STATUSES } from "./constants.js";
+import { todayISO } from "./dates.js";
 
 // ─── Persistenz ───
 // Einziger Speicherort ist localStorage["trainerhub_v1"]. Eine spätere Sync-Schicht
@@ -86,10 +87,13 @@ export function getPlayerName(pid, data) {
   return (data.players ?? []).find(p => p.id === pid)?.name ?? "?";
 }
 
-export function getActiveSeason(teamId, seasons) {
-  return (seasons ?? [])
+// Aktive Saison: nicht abgeschlossen und heute im Zeitraum; sonst die jüngste nicht abgeschlossene
+// (z. B. Vorbereitung vor Saisonbeginn). Einzige Definition – workspace.js verwendet sie ebenfalls.
+export function getActiveSeason(teamId, seasons, today = todayISO()) {
+  const open = (seasons ?? [])
     .filter(s => s.teamId === teamId && s.phase !== "abgeschlossen")
-    .sort((a, b) => b.startDate.localeCompare(a.startDate))[0] ?? null;
+    .sort((a, b) => b.startDate.localeCompare(a.startDate));
+  return open.find(s => s.startDate <= today && today <= s.endDate) ?? open[0] ?? null;
 }
 
 export function getSeasonSessions(season, sessions) {
