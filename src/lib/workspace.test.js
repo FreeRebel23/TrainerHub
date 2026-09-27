@@ -176,3 +176,39 @@ describe("Spiele und Als Nächstes", () => {
     expect(agenda("u18", d, TODAY)).toMatchObject({ todayPlan: null, nextPlan: null, nextGame: null, lastSession: null });
   });
 });
+
+describe("Historie ohne Saisonkader", () => {
+  it("die bisherige Teamliste wird vergangenen Saisons nicht als Kader untergeschoben", () => {
+    const d = base();
+    expect(roster("u16", d.seasons[0], d, { today: TODAY })).toEqual([]);                        // 2025/26 (abgeschlossen)
+    expect(roster("u16", d.seasons[1], d, { today: TODAY }).map(r => r.player.id)).toEqual(["ina", "mia"]);
+    expect(trainingRoster("u16", "2026-03-01", d).map(p => p.id)).toEqual([]);                  // Nachtrag in alter Saison
+  });
+});
+
+describe("Vereinsgröße", () => {
+  it("3 Saisons, 450 Trainings, 900 Beobachtungen, 18 Teams: Workspace-Berechnungen bleiben schnell", () => {
+    const teams = Array.from({ length: 18 }, (_, i) => ({ id: `t${i}`, name: `Team ${i}`, playerIds: [] }));
+    const players = Array.from({ length: 300 }, (_, i) => ({ id: `p${i}`, name: `Person ${i}` }));
+    const seasons = teams.flatMap(t => [2024, 2025, 2026].map(y => ({ id: `${t.id}s${y}`, teamId: t.id, name: `${y}`,
+      startDate: `${y}-08-01`, endDate: `${y + 1}-06-30`, phase: y === 2026 ? "saison" : "abgeschlossen" })));
+    const rosterEntries = seasons.flatMap(s => Array.from({ length: 15 }, (_, k) => {
+      const pid = `p${(Number(s.teamId.slice(1)) * 15 + k) % 300}`;
+      return { id: rosterEntryId(s.id, pid), seasonId: s.id, teamId: s.teamId, playerId: pid, status: "active" };
+    }));
+    const day = n => { const d = new Date(Date.UTC(2024, 7, 1) + n * 86400000); return d.toISOString().slice(0, 10); };
+    const sessions = Array.from({ length: 450 }, (_, i) => ({ id: `s${i}`, teamId: "t0", date: day(i * 2), durationMinutes: 90,
+      tags: ["Pressbreak"], attendance: rosterEntries.filter(e => e.teamId === "t0").slice(0, 15).map(e => ({ playerId: e.playerId, status: "present" })) }));
+    const observations = Array.from({ length: 900 }, (_, i) => ({ id: `o${i}`, teamId: "t0", playerId: `p${i % 15}`, date: day(i), text: "x", tags: ["Wurf"] }));
+    const d = { teams, players, seasons, rosterEntries, sessions, observations, plannedSessions: [] };
+    const t0 = performance.now();
+    const season = activeSeason("t0", d, TODAY);
+    agenda("t0", d, TODAY);
+    const r = roster("t0", season, d);
+    r.forEach(({ player }) => { playerObservations(player.id, d, { season }); playerAttendance(player.id, "t0", season, d); });
+    teamGames("t0", d, { season });
+    const ms = performance.now() - t0;
+    expect(r).toHaveLength(15);
+    expect(ms).toBeLessThan(250);
+  });
+});

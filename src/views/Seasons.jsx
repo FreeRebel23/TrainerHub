@@ -1,7 +1,12 @@
 import { useState } from "react";
-import { Plus, Trash2, CalendarRange, ArrowRightLeft, CheckCircle2, AlertTriangle, Check } from "lucide-react";
+import { Plus, Trash2, CalendarRange, ArrowRightLeft, CheckCircle2, AlertTriangle, Check, Target, Pencil } from "lucide-react";
 import { PHASES } from "../lib/constants.js";
-import { byId, uid, getTeamPlayers, getSeasonSessions } from "../lib/data.js";
+import { byId, uid, getSeasonSessions } from "../lib/data.js";
+import { knownTags } from "../lib/training.js";
+import {
+  roster, createSeason, takeOverCandidates, activeSeason, seasonsOf, addToRoster, goalCoverage, newGoal, teamGames,
+} from "../lib/workspace.js";
+import { TagPicker, TagList } from "../components/training.jsx";
 import { todayISO, fmtDate, getHoliday, getSchoolHoliday, parseISO } from "../lib/dates.js";
 import {
   Button, IconButton, PageHeader, Section, Row, Meta, EmptyState, Field, ChoiceChips, Segmented, Notice, cx,
@@ -47,8 +52,11 @@ export function SeasonListView({ data, teamId, go, back }) {
   );
 }
 
-export function NewSeasonView({ update, teamId, back }) {
+export function NewSeasonView({ data, update, teamId, back }) {
   const yr = new Date().getFullYear();
+  // Saisonwechsel: aktive/pausierte Personen der laufenden Saison (bzw. Teamliste) übernehmen
+  const candidates = takeOverCandidates(teamId, data, todayISO());
+  const [take, setTake] = useState(() => Object.fromEntries(candidates.map(p => [p.id, true])));
   const [name,  setName]  = useState("Saison " + yr + "/" + String(yr + 1).slice(2));
   const [start, setStart] = useState(yr + "-09-01");
   const [end,   setEnd]   = useState((yr + 1) + "-06-30");
@@ -58,8 +66,8 @@ export function NewSeasonView({ update, teamId, back }) {
 
   function save() {
     if (!valid) return;
-    const season = { id: uid(), teamId, name: name.trim(), startDate: start, endDate: end, phase, gamedays: [] };
-    update(d => ({ ...d, seasons: [...(d.seasons ?? []), season] }));
+    const takeOver = candidates.filter(p => take[p.id]).map(p => p.id);
+    update(d => createSeason(d, { teamId, name, startDate: start, endDate: end, phase, takeOver, today: todayISO() }).data);
     back();
   }
 
@@ -83,6 +91,17 @@ export function NewSeasonView({ update, teamId, back }) {
             <ChoiceChips label="Startphase" value={phase} onChange={setPhase}
               options={Object.entries(PHASES).filter(([k]) => k !== "abgeschlossen").map(([k, p]) => ({ value: k, label: p.label }))} />
           </Field>
+          {candidates.length > 0 && (
+            <Field label="Kader übernehmen" aside={`${Object.values(take).filter(Boolean).length} von ${candidates.length}`}>
+              <div className="chips" role="group" aria-label="Kader übernehmen">
+                {candidates.map(p => (
+                  <button key={p.id} type="button" className="chip" aria-pressed={!!take[p.id]}
+                    onClick={() => setTake(t => ({ ...t, [p.id]: !t[p.id] }))}>{p.name}</button>
+                ))}
+              </div>
+              <p className="field__hint">Die bisherige Saison und ihr Kader bleiben unverändert erhalten.</p>
+            </Field>
+          )}
         </div>
         <div className="action-bar">
           <Button variant="primary" size="lg" type="submit" disabled={!valid}>Saison anlegen</Button>
@@ -109,8 +128,9 @@ export function SeasonDetailView({ data, update, seasonId, go, back }) {
 
   const team     = byId(data.teams, season.teamId);
   const sessions = getSeasonSessions(season, data.sessions);
-  const gamedays = [...(season.gamedays ?? [])].sort((a, b) => a.date.localeCompare(b.date));
+  const games    = teamGames(season.teamId, data, { season });
   const today    = todayISO();
+  const players  = roster(season.teamId, season, data, { statuses: ["active", "paused"] });
 
   function changePhase(newPhase) {
     update(d => ({
@@ -155,8 +175,8 @@ export function SeasonDetailView({ data, update, seasonId, go, back }) {
 
         <div className="facts">
           <div><p className="fact__value">{sessions.length}</p><p className="fact__label">Trainings</p></div>
-          <div><p className="fact__value">{gamedays.length}</p><p className="fact__label">Spieltage</p></div>
-          <div><p className="fact__value">{getTeamPlayers(season.teamId, data).length}</p><p className="fact__label">Spieler:innen</p></div>
+          <div><p className="fact__value">{games.length}</p><p className="fact__label">Spiele</p></div>
+          <div><p className="fact__value">{players.length}</p><p className="fact__label">Spieler:innen</p></div>
         </div>
 
         {season.phase !== "abgeschlossen" && (
@@ -166,16 +186,18 @@ export function SeasonDetailView({ data, update, seasonId, go, back }) {
           </Section>
         )}
 
-        <Section title="Spieltage" hint={`${gamedays.length}`}>
-          {gamedays.length === 0 && !showAddGame && <p className="text-3">Noch keine Spieltage eingetragen.</p>}
-          {gamedays.length > 0 && (
+        <GoalsSection season={season} sessions={sessions} data={data} update={update} readOnly={season.phase === "abgeschlossen"} />
+
+        <Section title="Spiele" hint={`${games.length}`}>
+          {games.length === 0 && !showAddGame && <p className="text-3">Noch keine Spiele eingetragen.</p>}
+          {games.length > 0 && (
             <div className="list">
-              {gamedays.map(g => {
+              {games.map(g => {
                 const hol  = getHoliday(g.date);
                 const schH = getSchoolHoliday(g.date);
                 const d = parseISO(g.date);
                 return (
-                  <div key={g.id} className={cx("row", g.date < today && "text-2")}>
+                  <div key={g.key} className={cx("row", g.date < today && "text-2")}>
                     <span className={cx("date-block", g.date === today && "date-block--today")}>
                       <span className="date-block__day">{d.getDate()}</span>
                       <span className="date-block__wd">{d.toLocaleDateString("de-DE", { month: "short" })}</span>
@@ -183,10 +205,13 @@ export function SeasonDetailView({ data, update, seasonId, go, back }) {
                     <span className="row__main">
                       <span className="row__title">{g.isHome ? "gegen" : "bei"} {g.opponent || "Gegner offen"}</span>
                       <span className="row__meta">
-                        <Meta items={[g.isHome ? "Heim" : "Auswärts", g.result && `Ergebnis ${g.result}`, hol, schH && "Schulferien"]} />
+                        <Meta items={[g.time && `${g.time} Uhr`, g.isHome ? "Heim" : "Auswärts", g.result && `Ergebnis ${g.result}`,
+                          g.status === "cancelled" && "abgesagt", g.competition, hol, schH && "Schulferien"]} />
                       </span>
                     </span>
-                    <IconButton icon={Trash2} size={18} label="Spieltag löschen" onClick={() => delGameday(g)} />
+                    {g.source === "manual"
+                      ? <IconButton icon={Trash2} size={18} label="Spieltag löschen" onClick={() => delGameday({ ...g, id: g.key.slice(8) })} />
+                      : <span className="tag" title="Aus dem Spielplan des Verbands">Verband</span>}
                   </div>
                 );
               })}
@@ -216,7 +241,7 @@ export function SeasonDetailView({ data, update, seasonId, go, back }) {
               </div>
             </form>
           ) : (
-            <Button icon={Plus} onClick={() => setShowAddGame(true)} className="self-start">Spieltag hinzufügen</Button>
+            <Button icon={Plus} onClick={() => setShowAddGame(true)} className="self-start">Spiel eintragen</Button>
           )}
         </Section>
 
@@ -238,7 +263,7 @@ export function SeasonDetailView({ data, update, seasonId, go, back }) {
 export function JahrgangUpgradeView({ data, update, seasonId, go, back }) {
   const season     = (data.seasons ?? []).find(s => s.id === seasonId);
   const srcTeam    = season ? byId(data.teams, season.teamId) : null;
-  const srcPlayers = srcTeam ? getTeamPlayers(srcTeam.id, data) : [];
+  const srcPlayers = srcTeam ? roster(srcTeam.id, season, data, { statuses: ["active", "paused"] }).map(r => r.player) : [];
   const others     = (data.teams ?? []).filter(t => t.id !== srcTeam?.id);
   const [sel, setSel]      = useState({});
   const [targetId, setTgt] = useState(others[0]?.id ?? "");
@@ -253,17 +278,12 @@ export function JahrgangUpgradeView({ data, update, seasonId, go, back }) {
     const ids = Object.entries(sel).filter(([, v]) => v).map(([k]) => k);
     if (!ids.length || !targetId) return;
     update(d => {
-      const tgt = d.teams.find(t => t.id === targetId);
-      if (!tgt) return d;
-      const existing = new Set(tgt.playerIds ?? []);
-      const toAdd    = ids.filter(id => !existing.has(id));
-      return {
-        ...d,
-        teams:   d.teams.map(t => t.id !== targetId ? t : {
-          ...t, playerIds: [...(t.playerIds ?? []), ...toAdd],
-        }),
-        seasons: d.seasons.map(s => s.id !== seasonId ? s : { ...s, phase: "abgeschlossen" }),
-      };
+      if (!d.teams.some(t => t.id === targetId)) return d;
+      // Zielteam: in dessen aktive (sonst jüngste) Saison übernehmen; ohne Saison in die Teamliste.
+      // Die abgeschlossene Saison behält ihren Kader – die Historie bleibt korrekt.
+      const target = activeSeason(targetId, d, todayISO()) ?? seasonsOf(targetId, d)[0] ?? null;
+      const next = ids.reduce((acc, playerId) => addToRoster(acc, { teamId: targetId, season: target, playerId }), d);
+      return { ...next, seasons: next.seasons.map(s => s.id !== seasonId ? s : { ...s, phase: "abgeschlossen" }) };
     });
     setDone(true);
   }
@@ -289,14 +309,14 @@ export function JahrgangUpgradeView({ data, update, seasonId, go, back }) {
       <PageHeader title="Jahrgangswechsel" back={back} />
       <div className="page-body">
         <p className="text-2">
-          Spieler:innen aus <strong>{srcTeam.name}</strong> in ein anderes Team übernehmen. Sie bleiben
-          zusätzlich in {srcTeam.name}, bis du sie dort entfernst. Die Saison wird danach abgeschlossen.
+          Spieler:innen aus <strong>{srcTeam.name}</strong> in ein anderes Team übernehmen (in dessen aktuelle
+          Saison). Der Kader von {season.name} bleibt als Historie erhalten. Die Saison wird danach abgeschlossen.
         </p>
 
         {others.length > 0 ? (
           <Field label="Zielteam">
             <ChoiceChips label="Zielteam" value={targetId} onChange={setTgt}
-              options={others.map(t => ({ value: t.id, label: t.name, meta: t.playerIds?.length ?? 0 }))} />
+              options={others.map(t => ({ value: t.id, label: t.name }))} />
           </Field>
         ) : (
           <Notice tone="warning" icon={AlertTriangle}>Kein weiteres Team vorhanden. Lege zuerst unter Teams ein Zielteam an.</Notice>
@@ -325,5 +345,72 @@ export function JahrgangUpgradeView({ data, update, seasonId, go, back }) {
         </Button>
       </div>
     </div>
+  );
+}
+
+// Saisonziele: wenige freie Schwerpunkte. Optional mit Trainingsthemen verknüpft – dann zeigt TrainerHub
+// nur, wie oft und wie lange dazu trainiert wurde. Kein Fortschritt, keine Bewertung.
+function GoalsSection({ season, sessions, data, update, readOnly }) {
+  const goals = season.goals ?? [];
+  const [edit, setEdit] = useState(null);   // null | "new" | goal.id
+  const [text, setText] = useState("");
+  const [tags, setTags] = useState([]);
+  const confirm = useConfirm();
+  const save = next => update(d => ({ ...d, seasons: d.seasons.map(s => s.id !== season.id ? s : { ...s, goals: next }) }));
+
+  function open(goal) { setEdit(goal?.id ?? "new"); setText(goal?.text ?? ""); setTags(goal?.tags ?? []); }
+  function submit() {
+    if (!text.trim()) return;
+    save(edit === "new" ? [...goals, newGoal(text, tags)] : goals.map(g => g.id === edit ? { ...g, text: text.trim(), tags } : g));
+    setEdit(null);
+  }
+  async function remove(goal) {
+    if (!(await confirm({ title: "Saisonziel entfernen?", text: goal.text, danger: true, confirmLabel: "Entfernen" }))) return;
+    save(goals.filter(g => g.id !== goal.id));
+    setEdit(null);
+  }
+
+  return (
+    <Section title="Saisonziele" hint={goals.length ? `${goals.length}` : undefined}
+      action={!readOnly && edit === null && <Button size="sm" variant="accent-ghost" icon={Plus} onClick={() => open(null)}>Ziel</Button>}>
+      {goals.length === 0 && edit === null && <p className="text-3">Noch keine Saisonziele. Wenige Schwerpunkte reichen – z. B. „Pressbreak stabilisieren“.</p>}
+      {goals.length > 0 && (
+        <div className="list">
+          {goals.map(g => {
+            const cov = goalCoverage(g, sessions);
+            return (
+              <div key={g.id} className="row row--top">
+                <span className="row__lead"><Target size={20} aria-hidden="true" /></span>
+                <span className="row__main">
+                  <span className="row__title">{g.text}</span>
+                  <span className="row__meta">
+                    {cov ? <Meta items={[`${cov.count} Trainings mit ${g.tags.join(" / ")}`, cov.minutes > 0 && `${cov.minutes} min`]} />
+                      : "Kein Trainingsthema verknüpft"}
+                  </span>
+                </span>
+                {!readOnly && <IconButton icon={Pencil} size={18} label={`„${g.text}“ bearbeiten`} onClick={() => open(g)} />}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {edit !== null && (
+        <form className="card form expand" onSubmit={e => { e.preventDefault(); submit(); }}>
+          <Field label="Ziel" htmlFor="goal-text">
+            <input id="goal-text" className="input" value={text} onChange={e => setText(e.target.value)} autoFocus autoComplete="off"
+              placeholder="z. B. Ballbewegung verbessern" />
+          </Field>
+          <Field label="Passende Trainingsthemen" hint="optional – dann siehst du, wie oft dazu trainiert wurde">
+            <TagPicker value={tags} onChange={setTags} options={knownTags(data)} />
+          </Field>
+          {tags.length > 0 && <TagList tags={tags} />}
+          <div className="btn-row">
+            {edit !== "new" && <Button variant="danger" onClick={() => remove(goals.find(g => g.id === edit))}>Entfernen</Button>}
+            <Button variant="ghost" onClick={() => setEdit(null)}>Abbrechen</Button>
+            <Button variant="primary" type="submit" disabled={!text.trim()}>Speichern</Button>
+          </div>
+        </form>
+      )}
+    </Section>
   );
 }

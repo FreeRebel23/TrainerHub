@@ -9,6 +9,7 @@
 // Neue Felder/Listen sind optional: ältere Datenstände werden gelesen, nicht umgeschrieben.
 
 import { uid, isPresent, getActiveSeason } from "./data.js";
+import { todayISO } from "./dates.js";
 import { stableId } from "./ids.js";
 import { normalizeTags, content, byDateTime } from "./training.js";
 
@@ -53,8 +54,10 @@ export function usesSeasonRoster(teamId, data) {
 }
 
 // Kader eines Teams in einer Saison: [{ player, entry }] (entry = null bei der bisherigen Teamliste).
-// statuses: welche Status zählen (Standard: alle – auch „nicht mehr im Kader“ für die Historie)
-export function roster(teamId, season, data, { statuses = null } = {}) {
+// statuses: welche Status zählen (Standard: alle – auch „nicht mehr im Kader“ für die Historie).
+// Die bisherige Teamliste gilt nur für „jetzt“ (ohne Saison bzw. aktive Saison) – vergangenen
+// Saisons wird kein Kader untergeschoben, den es so vielleicht nie gab.
+export function roster(teamId, season, data, { statuses = null, today = todayISO() } = {}) {
   const byPlayer = new Map(list(data, "players").map(p => [p.id, p]));
   let rows;
   if (usesSeasonRoster(teamId, data)) {
@@ -62,10 +65,10 @@ export function roster(teamId, season, data, { statuses = null } = {}) {
       ? list(data, "rosterEntries").filter(e => e.teamId === teamId && e.seasonId === season.id)
           .map(entry => ({ player: byPlayer.get(entry.playerId), entry }))
       : [];
-  } else {
+  } else if (!season || season.id === activeSeason(teamId, data, today)?.id) {
     const team = list(data, "teams").find(t => t.id === teamId);
     rows = (team?.playerIds ?? []).map(id => ({ player: byPlayer.get(id), entry: null }));
-  }
+  } else rows = [];
   return rows
     .filter(r => r.player && (!statuses || statuses.includes(r.entry?.status || "active")))
     .sort((a, b) => a.player.name.localeCompare(b.player.name, "de"));
@@ -73,7 +76,7 @@ export function roster(teamId, season, data, { statuses = null } = {}) {
 
 // Wer steht an einem Trainingstag im Kader? (für die Anwesenheit; nur aktive)
 export function trainingRoster(teamId, date, data) {
-  return roster(teamId, seasonAt(teamId, date, data) ?? activeSeason(teamId, data, date), data, { statuses: ["active"] })
+  return roster(teamId, seasonAt(teamId, date, data) ?? activeSeason(teamId, data, date), data, { statuses: ["active"], today: date })
     .map(r => r.player);
 }
 
@@ -143,7 +146,7 @@ export function createSeason(data, { teamId, name, startDate, endDate, phase = "
 // Wer kann in eine neue Saison übernommen werden? Aktive/pausierte der Vorsaison bzw. die Teamliste.
 export function takeOverCandidates(teamId, data, today) {
   const prev = activeSeason(teamId, data, today) ?? seasonsOf(teamId, data)[0] ?? null;
-  return roster(teamId, prev, data, { statuses: ["active", "paused"] }).map(r => r.player);
+  return roster(teamId, prev, data, { statuses: ["active", "paused"], today }).map(r => r.player);
 }
 
 // ─── Beobachtungen ───
@@ -194,6 +197,17 @@ export function sessionObservations(session, data) {
   return list(data, "observations")
     .filter(o => o.sessionId === session.id || (!o.sessionId && session.planId && o.planId === session.planId))
     .sort((a, b) => (a.capturedAt ?? "").localeCompare(b.capturedAt ?? ""));
+}
+
+// Woher stammt eine Beobachtung? → { label, view, params } (Training, geplantes Training, Spiel)
+export function observationSource(o, data) {
+  const s = o.sessionId && list(data, "sessions").find(x => x.id === o.sessionId);
+  if (s) return { label: "Training", view: "session_detail", params: { sessionId: s.id } };
+  const p = o.planId && list(data, "plannedSessions").find(x => x.id === o.planId);
+  if (p) return p.recordedId ? { label: "Training", view: "session_detail", params: { sessionId: p.recordedId } }
+    : { label: "Training (läuft/geplant)", view: "plan_detail", params: { planId: p.id } };
+  if (o.gameRef) return { label: "Spiel", view: null, params: null };
+  return null;
 }
 
 // Wiederkehrende Themen einer Person: nur Häufigkeiten der Themen ihrer Beobachtungen – keine Bewertung

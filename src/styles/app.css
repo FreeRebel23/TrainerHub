@@ -743,3 +743,34 @@ button.row:active, .file-row:active, .chip:active:not([aria-pressed="true"]), .a
   padding-left: max(var(--gutter, var(--space-4)), env(safe-area-inset-left));
   padding-right: max(var(--gutter, var(--space-4)), env(safe-area-inset-right));
 }
+
+/* ─── Phase 4: Team Workspace, Kader, Beobachtungen ─── */
+
+/* Mannschaft im Seitenkopf: Name ist zugleich der Teamwechsel */
+.team-switch {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  min-height: var(--tap); margin: 0 calc(-1 * var(--space-2)); padding: 0 var(--space-2);
+  border: 0; border-radius: var(--radius-md); background: transparent;
+  color: inherit; font: inherit; letter-spacing: inherit; cursor: pointer;
+}
+.team-switch svg { color: var(--text-3); flex-shrink: 0; }
+.team-switch:active { background: var(--surface-2); }
+.team-switch:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+@media (hover: hover) { .team-switch:hover { background: var(--surface-2); } }
+.ws-season { color: var(--text-2); font-size: var(--text-sm); margin-top: calc(-1 * var(--space-2)); }
+
+/* Bottom Sheet: gleiche Optik wie der Bestätigungsdialog, Inhalt scrollt, Aktion bleibt sichtbar */
+.sheet { max-height: 100%; }
+.sheet__body { max-height: 92vh; max-height: 92dvh; }
+.sheet__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-top: calc(-1 * var(--space-2)); }
+.sheet__content { display: flex; flex-direction: column; gap: var(--space-3); overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
+.sheet__content .section__title { margin-top: var(--space-2); }
+.sheet__footer { margin-top: var(--space-3); }
+@media (min-width: 600px) { .sheet[open] { max-width: 520px; } }
+
+/* Beobachtungen */
+.obs-pick { display: flex; flex-direction: column; gap: var(--space-2); }
+.obs-players .chip { min-height: var(--tap); }
+.obs__text { display: block; color: var(--text); white-space: pre-line; overflow-wrap: anywhere; }
+.obs__tags { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-1); }
+.obs-list { margin: 0; }

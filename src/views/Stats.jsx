@@ -76,13 +76,15 @@ function ContentOverview({ sessions }) {
 }
 
 // Auswertung: Trainingsinhalte (Saisonübersicht) und Trainingsbeteiligung je Team.
-export function StatsView({ data }) {
+// Aus dem Team Workspace mit Team und Saison vorausgewählt (params.teamId/seasonId).
+export function StatsView({ data, params = {} }) {
   const teams = data.teams ?? [];
-  const [tid, setTid]       = useState(teams[0]?.id ?? "");
+  const startTeam = teams.some(t => t.id === params.teamId) ? params.teamId : teams[0]?.id ?? "";
+  const [tid, setTid]       = useState(startTeam);
   const [tab, setTab]       = useState("content");
   const [filter, setFilter] = useState("all");   // Trainingsart
   // Standard: laufende Saison des Teams, sonst Gesamt
-  const [sfilt, setSfilt]   = useState(() => getActiveSeason(teams[0]?.id, data.seasons)?.id ?? "all");
+  const [sfilt, setSfilt]   = useState(() => params.seasonId ?? getActiveSeason(startTeam, data.seasons)?.id ?? "all");
   const team = byId(teams, tid);
   const teamSeasons = [...(data.seasons ?? []).filter(s => s.teamId === tid)]
     .sort((a, b) => b.startDate.localeCompare(a.startDate));

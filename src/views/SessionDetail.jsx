@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Pencil, Printer, Trash2, Sun, SearchX, Copy } from "lucide-react";
+import { Pencil, Printer, Trash2, Sun, SearchX, Copy, Eye } from "lucide-react";
 import { fmtDateLong, getSchoolHoliday } from "../lib/dates.js";
 import { STATUSES, STATUS_KEYS } from "../lib/constants.js";
-import { byId, countPresent } from "../lib/data.js";
+import { byId, countPresent, isPresent } from "../lib/data.js";
 import { printSession } from "../lib/io.js";
 import {
   Button, IconButton, PageHeader, Section, Meta, EmptyState, Notice, Field, cx,
@@ -10,11 +10,13 @@ import {
 import { useConfirm } from "../components/confirm.jsx";
 import { AttendanceList, DrillList, TagPicker, TagList } from "../components/training.jsx";
 import { normalizeDrill, normalizeTags, knownTags } from "../lib/training.js";
+import { sessionObservations, trainingRoster } from "../lib/workspace.js";
+import { ObservationList, useObservationCapture } from "../components/observation.jsx";
 
 // Eine Trainingseinheit: Inhalt zuerst, Aktionen zurückhaltend.
 // Bearbeiten ist eine eigene Navigationsebene (params.edit): ohne Tab-Leiste, Zurück bzw.
 // Wischgeste bricht ab, ein versehentlicher Tab-Wechsel kann keine Eingaben verwerfen.
-export function SessionDetailView({ data, update, sessionId, editing, go, back, onDelete }) {
+export function SessionDetailView({ data, update, sessionId, editing, go, back, onDelete, me }) {
   const sess = (data.sessions ?? []).find(s => s.id === sessionId);
   const [editNote, setEditNote] = useState(() => sess?.note ?? "");
   const [editAtt,  setEditAtt]  = useState(() => (sess?.attendance ?? []).map(a => ({ ...a })));
@@ -22,6 +24,7 @@ export function SessionDetailView({ data, update, sessionId, editing, go, back, 
   const [editFocus, setEditFocus] = useState(() => sess?.focus ?? "");
   const [editTags,  setEditTags]  = useState(() => sess?.tags ?? []);
   const confirm = useConfirm();
+  const capture = useObservationCapture({ update, me, tagOptions: knownTags(data) });
 
   if (!sess) {
     return (
@@ -64,7 +67,8 @@ export function SessionDetailView({ data, update, sessionId, editing, go, back, 
 
   async function remove() {
     if (await confirm({ title: "Training löschen?", danger: true, confirmLabel: "Löschen",
-      text: `${title} vom ${fmtDateLong(sess.date)} mit Anwesenheit, Notiz und Übungen. Das lässt sich nicht rückgängig machen.` })) onDelete(sess.id);
+      text: `${title} vom ${fmtDateLong(sess.date)} mit Anwesenheit, Notiz und Übungen. Das lässt sich nicht rückgängig machen. `
+        + "Beobachtungen zu Spieler:innen bleiben in deren Profil erhalten." })) onDelete(sess.id);
   }
 
   const head = (
@@ -93,8 +97,8 @@ export function SessionDetailView({ data, update, sessionId, editing, go, back, 
           <Section title="Übungen">
             <DrillList items={editCL} onChange={setEditCL} />
           </Section>
-          <Section title="Beobachtungen">
-            <textarea className="textarea" aria-label="Beobachtungen und Notizen" value={editNote}
+          <Section title="Notiz">
+            <textarea className="textarea" aria-label="Notiz zum Training" value={editNote}
               onChange={e => setEditNote(e.target.value)} rows={4} placeholder="Was lief gut, was nicht?" />
           </Section>
           <Section title="Anwesenheit" hint={`${editAtt.filter(a => ["present", "injured_present"].includes(a.status)).length} von ${editAtt.length} dabei`}>
@@ -111,6 +115,8 @@ export function SessionDetailView({ data, update, sessionId, editing, go, back, 
 
   // ─── Ansehen ───
   const doneCount = drills.filter(d => d.done).length;
+  const observations = sessionObservations(sess, data);
+  const present = att.filter(a => isPresent(a.status)).map(a => getPlayer(a.playerId)).filter(Boolean);
 
   return (
     <div className="page">
@@ -148,9 +154,18 @@ export function SessionDetailView({ data, update, sessionId, editing, go, back, 
           </Section>
         )}
 
-        <Section title={sess.focus || drills.length ? "Beobachtungen" : "Notiz"}>
-          {sess.note ? <p className="prose">{sess.note}</p> : <p className="text-3">Keine Notiz.</p>}
+        <Section title="Beobachtungen"
+          action={<Button size="sm" variant="accent-ghost" icon={Eye} onClick={() => capture.open({ teamId: sess.teamId, date: sess.date, sessionId: sess.id,
+            players: [...present, ...trainingRoster(sess.teamId, sess.date, data).filter(p => !present.includes(p))] })}>Beobachtung</Button>}>
+          <ObservationList items={observations} playerName={pid => getPlayer(pid)?.name ?? "?"}
+            onOpen={o => go("player", { playerId: o.playerId, teamId: sess.teamId })} emptyText="Keine Beobachtungen zu einzelnen Spieler:innen." />
         </Section>
+
+        {sess.note && (
+          <Section title="Notiz">
+            <p className="prose">{sess.note}</p>
+          </Section>
+        )}
 
         <Section title="Anwesenheit">
           {att.length === 0 ? <p className="text-3">Keine Anwesenheit erfasst.</p> : (
@@ -175,6 +190,7 @@ export function SessionDetailView({ data, update, sessionId, editing, go, back, 
 
         {sess.erfasstVon && <p className="footnote">Erfasst von {sess.erfasstVon}</p>}
       </div>
+      {capture.sheet}
     </div>
   );
 }

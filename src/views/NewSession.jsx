@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Users, FileText, Sun, CheckCheck, RotateCcw, Pencil, Tags, History } from "lucide-react";
+import { Users, FileText, Sun, CheckCheck, RotateCcw, Pencil, Tags, History, Eye } from "lucide-react";
 import { todayISO, fmtDateFull, getSchoolHoliday, getHoliday } from "../lib/dates.js";
-import { byId, calcFactor, getTeamPlayers, isPresent, uid } from "../lib/data.js";
+import { byId, calcFactor, isPresent, uid } from "../lib/data.js";
+import { trainingRoster } from "../lib/workspace.js";
 import { DURATIONS } from "../lib/constants.js";
 import {
   sessionDraftFromPlan, planDefaults, normalizeTags, normalizeDrill, knownTags, content, drillMinutes,
@@ -11,6 +12,7 @@ import {
   Button, IconButton, PageHeader, Section, EmptyState, Field, ChoiceChips, Notice, Meta,
 } from "../components/ui.jsx";
 import { AttendanceList, DrillList, TagPicker, TagList } from "../components/training.jsx";
+import { ObservationList, useObservationCapture } from "../components/observation.jsx";
 
 const fmtFactor = f => String(f).replace(".", ",");
 const defaultAtt = players => players.map(p => ({ playerId: p.id, status: p.injured ? "injured_absent" : "absent" }));
@@ -18,7 +20,7 @@ const defaultAtt = players => players.map(p => ({ playerId: p.id, status: p.inju
 function initialForm(data, params, plan) {
   if (plan) return { ...sessionDraftFromPlan(plan), note: "" };
   const date = params.date ?? todayISO();
-  const d = planDefaults(data, { date });
+  const d = planDefaults(data, { date, teamId: params.teamId });
   return { date, time: "", ...d, focus: "", tags: [], checklist: [], note: "", planId: null };
 }
 
@@ -27,7 +29,9 @@ function initialForm(data, params, plan) {
 //  – ohne Planung: 1) Rahmen, 2) Anwesenheit
 // Der Schritt liegt in der Navigation (params.step), params.steps zählt die Einträge des Ablaufs.
 // Ein Entwurf wird laufend gesichert, damit ein Beenden der PWA in der Halle nichts verliert.
-export function NewSessionView({ data, onSave, back, go, params }) {
+// Beobachtungen (Phase 4) werden sofort als eigene Datensätze gespeichert (überstehen Abbruch und
+// Neustart, Co-Trainer sieht sie nach dem Sync) und beim Abschluss mit dem Training verknüpft.
+export function NewSessionView({ data, update, onSave, back, go, params, me }) {
   const plan = params.planId ? byId(data.plannedSessions, params.planId) : params.plan ?? null;
   const step = params.step === 2 ? 2 : 1;
   const teams  = data.teams ?? [];
@@ -41,7 +45,9 @@ export function NewSessionView({ data, onSave, back, go, params }) {
   const [sessionId] = useState(uid);   // fest je Ablauf: ein Doppeltipp speichert nicht doppelt
   const saved = useRef(false);
   const [form, setForm] = useState(() => restored?.form ?? initialForm(data, params, plan));
-  const [att, setAtt] = useState(() => restored?.att ?? (step === 2 ? defaultAtt(getTeamPlayers(form.teamId, data)) : null));
+  const [att, setAtt] = useState(() => restored?.att ?? (step === 2 ? defaultAtt(trainingRoster(form.teamId, form.date, data)) : null));
+  const [obsIds, setObsIds] = useState(() => restored?.obsIds ?? []);
+  const capture = useObservationCapture({ update, me, tagOptions: knownTags(data) });
   const [showRestored, setShowRestored] = useState(!!restored);
   const [showNote, setShowNote] = useState(() => !!form.note);
   const [editFocus, setEditFocus] = useState(false);
@@ -51,8 +57,9 @@ export function NewSessionView({ data, onSave, back, go, params }) {
   const team  = byId(teams, form.teamId);
   const type  = byId(types, form.trainingTypeId);
   const venue = byId(venues, form.venueId);
-  const players = getTeamPlayers(form.teamId, data);
-  const playerMap = Object.fromEntries(players.map(p => [p.id, p]));
+  const players = trainingRoster(form.teamId, form.date, data);
+  // Anwesenheit kann Personen enthalten, die inzwischen nicht mehr im Kader sind (Entwurf/Planung)
+  const playerMap = Object.fromEntries([...(data.players ?? []), ...players].map(p => [p.id, p]));
 
   // Entwurf sichern, sobald tatsächlich etwas erfasst wurde (bloßes Öffnen legt keinen an).
   // dirty: wiederhergestellter Entwurf oder Rahmen in Schritt 1 gewählt – dann immer sichern.
@@ -60,10 +67,10 @@ export function NewSessionView({ data, onSave, back, go, params }) {
   const dirty = useRef(!!restored);
   useEffect(() => {
     if (!att || saved.current) return;
-    const snapshot = JSON.stringify({ form, att });
+    const snapshot = JSON.stringify({ form, att, obsIds });
     if (pristine.current === null) pristine.current = snapshot;
-    if (dirty.current || snapshot !== pristine.current) { dirty.current = true; saveDraft(key, { form, att }); }
-  }, [key, form, att]);
+    if (dirty.current || snapshot !== pristine.current) { dirty.current = true; saveDraft(key, { form, att, obsIds }); }
+  }, [key, form, att, obsIds]);
 
   function discardDraft() {
     clearDraft();
@@ -71,7 +78,8 @@ export function NewSessionView({ data, onSave, back, go, params }) {
     dirty.current = false;
     const fresh = initialForm(data, params, plan);
     setForm(fresh);
-    setAtt(step === 2 ? defaultAtt(getTeamPlayers(fresh.teamId, data)) : null);
+    setAtt(step === 2 ? defaultAtt(trainingRoster(fresh.teamId, fresh.date, data)) : null);
+    setObsIds([]);   // bereits erfasste Beobachtungen bleiben als Datensätze erhalten
     setShowRestored(false);
   }
 
@@ -85,7 +93,7 @@ export function NewSessionView({ data, onSave, back, go, params }) {
   function toAttendance() {
     dirty.current = true;   // gewählter Rahmen soll ein Beenden der App überstehen
     // Anwesenheit neu aufbauen, wenn das Team gewechselt wurde
-    if (!att || att.some(a => !playerMap[a.playerId]) || att.length !== players.length) setAtt(defaultAtt(players));
+    if (!att || att.some(a => !players.some(p => p.id === a.playerId)) || att.length !== players.length) setAtt(defaultAtt(players));
     go("new_session", { ...params, step: 2, steps: steps + 1 });
   }
   const changeFrame = () => go("new_session", { ...params, step: 1, steps: steps + 1 });
@@ -135,6 +143,14 @@ export function NewSessionView({ data, onSave, back, go, params }) {
     const reset = () => setAtt(prev => prev.map(a => ({ ...a, status: playerMap[a.playerId]?.injured ? "injured_absent" : "absent" })));
     const done = form.checklist.filter(d => d.done).length;
     const prepNote = plan ? content(plan).note : "";
+    // Beobachtungen dieses Trainings: in diesem Ablauf erfasst oder (von Co-Trainer:innen) zur Planung
+    const flowObs = (data.observations ?? []).filter(o => obsIds.includes(o.id) || (plan && o.planId === plan.id && !o.sessionId))
+      .sort((a, b) => (a.capturedAt ?? "").localeCompare(b.capturedAt ?? ""));
+    // Anwesende zuerst – wer da ist, wird beobachtet
+    const obsPlayers = [...players].sort((a, b) =>
+      Number(isPresent(att.find(x => x.playerId === b.id)?.status)) - Number(isPresent(att.find(x => x.playerId === a.id)?.status)));
+    const observe = () => capture.open({ teamId: form.teamId, date: form.date, planId: plan?.id, players: obsPlayers,
+      onSaved: o => setObsIds(ids => [...ids, o.id]) });
 
     function save() {
       if (saved.current) return;
@@ -150,7 +166,7 @@ export function NewSessionView({ data, onSave, back, go, params }) {
         ...(form.focus.trim() ? { focus: form.focus.trim() } : {}),
         ...(form.tags.length ? { tags: normalizeTags(form.tags) } : {}),
         ...(plan ? { planId: plan.id } : {}),
-      });
+      }, { observationIds: flowObs.map(o => o.id) });
     }
 
     return (
@@ -208,11 +224,17 @@ export function NewSessionView({ data, onSave, back, go, params }) {
             )}
           </Section>
 
-          <Section title="Beobachtungen">
+          <Section title="Beobachtungen"
+            action={players.length > 0 && <Button size="sm" variant="accent-ghost" icon={Eye} onClick={observe}>Beobachtung</Button>}>
+            <ObservationList items={flowObs} playerName={pid => playerMap[pid]?.name ?? "?"}
+              emptyText="Zu einzelnen Spieler:innen: „Beobachtung“ – Person wählen, kurz notieren, fertig." />
+          </Section>
+
+          <Section title="Notiz zum Training">
             {showNote || form.note ? (
-              <textarea className="textarea expand" aria-label="Beobachtungen und Notizen" value={form.note}
+              <textarea className="textarea expand" aria-label="Notiz zum Training" value={form.note}
                 onChange={e => set({ note: e.target.value })} rows={3} autoFocus={showNote && !form.note}
-                placeholder="Was lief gut, was nicht? Auffälligkeiten einzelner Spieler:innen …" />
+                placeholder="Was lief gut, was nicht?" />
             ) : (
               <Button variant="secondary" icon={FileText} onClick={() => setShowNote(true)} className="self-start">
                 Notiz hinzufügen
@@ -223,6 +245,7 @@ export function NewSessionView({ data, onSave, back, go, params }) {
         <div className="action-bar">
           <Button variant="primary" size="lg" onClick={save}>Training abschließen</Button>
         </div>
+        {capture.sheet}
       </div>
     );
   }
@@ -251,7 +274,7 @@ export function NewSessionView({ data, onSave, back, go, params }) {
           {teams.length > 1 ? (
             <Field label="Team">
               <ChoiceChips label="Team" value={form.teamId} onChange={pickTeam}
-                options={teams.map(t => ({ value: t.id, label: t.name, meta: t.playerIds?.length ?? 0 }))} />
+                options={teams.map(t => ({ value: t.id, label: t.name, meta: trainingRoster(t.id, form.date, data).length }))} />
             </Field>
           ) : null}
           {(schoolHol || holiday) && (

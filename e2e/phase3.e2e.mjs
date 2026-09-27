@@ -79,7 +79,7 @@ try {
   await shot(A, "01-migration");
   check("A: Übernahme zeigt lokalen Bestand", await A.page.getByText("1 Team · 5 Spieler:innen · 1 Trainings · 0 Planungen").isVisible());
   await A.page.getByRole("button", { name: "Daten übernehmen" }).click();
-  await A.page.getByText("Zuletzt trainiert").waitFor();
+  await A.page.getByRole("heading", { name: "Zuletzt", exact: true }).waitFor();   // Phase 4: Team Workspace
   check("A: nach Übernahme in der normalen App", await A.page.getByText("Wurf").first().isVisible());
   // Die App ist sofort nutzbar; der Upload läuft im Hintergrund weiter
   await A.page.waitForFunction(() => JSON.parse(localStorage.getItem("trainerhub_sync") ?? "{}").lastSync, null, { timeout: 15000 });
@@ -109,7 +109,7 @@ try {
   // ─── A2: zweites Gerät desselben Trainers ───
   const A2 = await device("A2");
   await login(A2, `florian@${DOMAIN}`, PW.A);
-  await A2.page.getByText("Zuletzt trainiert").waitFor();
+  await A2.page.getByRole("heading", { name: "Zuletzt", exact: true }).waitFor();
   await openBook(A2);
   await A2.page.getByText("Pressbreak gegen Ganzfeld").waitFor({ timeout: 10000 });
   check("A2: dieselbe Planung auf zweitem Gerät", true);
@@ -119,7 +119,7 @@ try {
   await admin.grant(`coach@${DOMAIN}`, u16.id, true);
   const B = await device("B");
   await login(B, `coach@${DOMAIN}`, PW.B);
-  await B.page.getByText("Zuletzt trainiert").waitFor();
+  await B.page.getByRole("heading", { name: "Zuletzt", exact: true }).waitFor();
   await openBook(B);
   await B.page.getByText("Pressbreak gegen Ganzfeld").waitFor({ timeout: 10000 });
   check("B: Co-Trainer sieht die gemeinsame Planung", true);
@@ -127,7 +127,7 @@ try {
   // ─── C: Trainer ohne Zugriff ───
   const C = await device("C");
   await login(C, `hand@${DOMAIN}`, PW.C);
-  await C.page.getByText("Zuletzt trainiert").waitFor();
+  await C.page.getByRole("heading", { name: "Zuletzt", exact: true }).waitFor();
   await openBook(C);
   check("C: sieht die Planung nicht", !(await C.page.getByText("Pressbreak gegen Ganzfeld").isVisible()));
   const meta = await storage(C, "trainerhub_sync");
@@ -149,14 +149,14 @@ try {
   await A.ctx.setOffline(true);
   await A.page.reload();                                   // App-Neustart ohne Netz (Service Worker)
   await A.page.getByRole("button", { name: "Start", exact: true }).last().click();   // Reload behält die letzte Ansicht
-  await A.page.getByText("Zuletzt trainiert").waitFor();
+  await A.page.getByRole("heading", { name: "Zuletzt", exact: true }).waitFor();   // Phase 4: Team Workspace
   check("A offline: App startet ohne Netz mit lokalen Daten", true);
   await A.page.getByRole("button", { name: "Training starten" }).first().click();
   await A.page.getByRole("button", { name: "Alle dabei" }).click();
   await A.page.getByRole("button", { name: /^Lena Berg:/ }).click();          // verletzt → nicht da
   await A.page.getByRole("button", { name: "3-gegen-2 Überzahl abhaken" }).click();
   await A.page.getByRole("button", { name: "Notiz hinzufügen" }).click();
-  await A.page.getByLabel("Beobachtungen und Notizen").fill("Offline in der Halle erfasst");
+  await A.page.getByLabel("Notiz zum Training").fill("Offline in der Halle erfasst");   // Phase 4: Notiz ≠ Beobachtung
   await shot(A, "04-offline-training");
   await A.page.getByRole("button", { name: "Training abschließen" }).click();
   await A.page.waitForTimeout(800);
@@ -180,7 +180,7 @@ try {
   await A2.page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));   // App kommt in den Vordergrund
   await A2.page.waitForFunction(id => (JSON.parse(localStorage.getItem("trainerhub_v1")).sessions ?? []).some(s => s.id === id), pendingSess.id, { timeout: 15000 });
   await A2.page.getByRole("button", { name: "Start", exact: true }).last().click();
-  await A2.page.getByText("Zuletzt trainiert").waitFor();
+  await A2.page.getByRole("heading", { name: "Zuletzt", exact: true }).waitFor();
   const a2 = await storage(A2, "trainerhub_v1");
   check("A2: abgeschlossenes Training sichtbar, Planung gilt als durchgeführt",
     a2.sessions.some(s => s.id === pendingSess.id) && a2.plannedSessions.find(p => p.id === plan.id)?.recordedId === pendingSess.id);
