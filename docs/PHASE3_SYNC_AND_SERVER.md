@@ -57,6 +57,11 @@ Datenobjekte, „10“ zählt die Auth-Collection mit. Hinzu kommen 5 PocketBase
 (`_superusers`, `_authOrigins`, `_externalAuths`, `_mfas`, `_otps`), die nicht zu TrainerHub gehören.
 Auf dem Staging-Server am 26.09.2026 so festgestellt.
 
+Ab Migration `1760000300_sports_data.js` (Branch `trainerhub-phase3-sports-data`) kommen **8 weitere
+Collections für Spielbetrieb & Verbandsdaten** hinzu (`team_links`, `competitions`, `team_competitions`,
+`games`, `standings`, `basketball_player_game_stats`, `player_links`, `sync_runs`) – serverseitig
+befüllt, nicht Teil des Offline-Syncs der App. Details: [SPORTS_DATA_ARCHITECTURE.md](SPORTS_DATA_ARCHITECTURE.md).
+
 Entscheidungen:
 
 - **Planung und Training bleiben getrennt** (Phase-2-Entscheidung). Die Verknüpfung liegt

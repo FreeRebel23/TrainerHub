@@ -1,0 +1,13 @@
+{
+ "timestamp": "2026-09-27T09:31:37+0200",
+ "status": "1",
+ "message": "no competition found with id 48109",
+ "data": null,
+ "version": "12.01.0-4a6771b",
+ "dateFormat": "yyyy-MM-dd",
+ "timeFormat": "yyyy-MM-dd'T'HH:mm:ssZ",
+ "timeFormatShort": "HH:mm",
+ "serverInstance": "www",
+ "username": null,
+ "appContext": "https://www.basketball-bund.net"
+}

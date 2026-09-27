@@ -1,0 +1,256 @@
+{
+ "timestamp": "2026-09-27T09:30:12+0200",
+ "status": "0",
+ "message": "",
+ "data": {
+  "prevSpieltag": null,
+  "selSpieltag": null,
+  "selSpielDatum": null,
+  "nextSpieltag": null,
+  "ligaData": {
+   "seasonId": 2026,
+   "seasonName": "2026/2027",
+   "actualMatchDay": {
+    "spieltag": 1,
+    "bezeichnung": "1. Spieltag"
+   },
+   "ligaId": 53074,
+   "liganame": "BBW2 Kreisliga A Nord Männer ",
+   "liganr": 72601,
+   "skName": "Kreisliga A",
+   "skNameSmall": null,
+   "skEbeneId": 2,
+   "skEbeneName": "Kreis",
+   "akName": "Senioren",
+   "geschlechtId": 1,
+   "geschlecht": "männlich",
+   "verbandId": 1,
+   "verbandName": "Baden-Württemberg",
+   "bezirknr": 2,
+   "bezirkName": "SchwarzwaldOberrhein",
+   "kreisnr": null,
+   "kreisname": null,
+   "statisticType": 1,
+   "vorabliga": false,
+   "tableExists": true,
+   "crossTableExists": true
+  },
+  "spieltage": null,
+  "matches": [],
+  "tabelle": {
+   "ligaData": null,
+   "entries": [
+    {
+     "rang": 1,
+     "team": {
+      "seasonTeamId": 450816,
+      "teamCompetitionId": 450816,
+      "teamPermanentId": 218079,
+      "teamname": "SG Eichenkreuz Karlsruhe 3",
+      "teamnameSmall": "SG EK",
+      "clubId": 886,
+      "verzicht": false
+     },
+     "anzspiele": 1,
+     "anzGewinnpunkte": 2,
+     "anzVerlustpunkte": 0,
+     "s": 1,
+     "n": 0,
+     "koerbe": 95,
+     "gegenKoerbe": 66,
+     "korbdiff": 29
+    },
+    {
+     "rang": 2,
+     "team": {
+      "seasonTeamId": 450814,
+      "teamCompetitionId": 450814,
+      "teamPermanentId": 167085,
+      "teamname": "TSV Ettlingen 4",
+      "teamnameSmall": "TSVE",
+      "clubId": 809,
+      "verzicht": false
+     },
+     "anzspiele": 1,
+     "anzGewinnpunkte": 2,
+     "anzVerlustpunkte": 0,
+     "s": 1,
+     "n": 0,
+     "koerbe": 65,
+     "gegenKoerbe": 58,
+     "korbdiff": 7
+    },
+    {
+     "rang": 3,
+     "team": {
+      "seasonTeamId": 441926,
+      "teamCompetitionId": 441926,
+      "teamPermanentId": 154749,
+      "teamname": "BG Karlsbad 2",
+      "teamnameSmall": "BGK 2",
+      "clubId": 1544,
+      "verzicht": false
+     },
+     "anzspiele": 0,
+     "anzGewinnpunkte": 0,
+     "anzVerlustpunkte": 0,
+     "s": 0,
+     "n": 0,
+     "koerbe": 0,
+     "gegenKoerbe": 0,
+     "korbdiff": 0
+    },
+    {
+     "rang": 4,
+     "team": {
+      "seasonTeamId": 441930,
+      "teamCompetitionId": 441930,
+      "teamPermanentId": 154730,
+      "teamname": "BG Renchen",
+      "teamnameSmall": "BGR",
+      "clubId": 1519,
+      "verzicht": false
+     },
+     "anzspiele": 0,
+     "anzGewinnpunkte": 0,
+     "anzVerlustpunkte": 0,
+     "s": 0,
+     "n": 0,
+     "koerbe": 0,
+     "gegenKoerbe": 0,
+     "korbdiff": 0
+    },
+    {
+     "rang": 5,
+     "team": {
+      "seasonTeamId": 441929,
+      "teamCompetitionId": 441929,
+      "teamPermanentId": 151210,
+      "teamname": "KIT SC Karlsruhe 2",
+      "teamnameSmall": "KIT S",
+      "clubId": 4079,
+      "verzicht": false
+     },
+     "anzspiele": 0,
+     "anzGewinnpunkte": 0,
+     "anzVerlustpunkte": 0,
+     "s": 0,
+     "n": 0,
+     "koerbe": 0,
+     "gegenKoerbe": 0,
+     "korbdiff": 0
+    },
+    {
+     "rang": 6,
+     "team": {
+      "seasonTeamId": 450815,
+      "teamCompetitionId": 450815,
+      "teamPermanentId": 154752,
+      "teamname": "Turnerschaft Durlach 2",
+      "teamnameSmall": "TuDu2",
+      "clubId": 537,
+      "verzicht": false
+     },
+     "anzspiele": 0,
+     "anzGewinnpunkte": 0,
+     "anzVerlustpunkte": 0,
+     "s": 0,
+     "n": 0,
+     "koerbe": 0,
+     "gegenKoerbe": 0,
+     "korbdiff": 0
+    },
+    {
+     "rang": 7,
+     "team": {
+      "seasonTeamId": 465833,
+      "teamCompetitionId": 465833,
+      "teamPermanentId": 154715,
+      "teamname": "TV Rastatt-Rheinau",
+      "teamnameSmall": "TVRR",
+      "clubId": 239,
+      "verzicht": false
+     },
+     "anzspiele": 0,
+     "anzGewinnpunkte": 0,
+     "anzVerlustpunkte": 0,
+     "s": 0,
+     "n": 0,
+     "koerbe": 0,
+     "gegenKoerbe": 0,
+     "korbdiff": 0
+    },
+    {
+     "rang": 8,
+     "team": {
+      "seasonTeamId": 450817,
+      "teamCompetitionId": 450817,
+      "teamPermanentId": 154755,
+      "teamname": "United Colors Heel Baden-Baden 2",
+      "teamnameSmall": "UCBB2",
+      "clubId": 4314,
+      "verzicht": false
+     },
+     "anzspiele": 0,
+     "anzGewinnpunkte": 0,
+     "anzVerlustpunkte": 0,
+     "s": 0,
+     "n": 0,
+     "koerbe": 0,
+     "gegenKoerbe": 0,
+     "korbdiff": 0
+    },
+    {
+     "rang": 9,
+     "team": {
+      "seasonTeamId": 441934,
+      "teamCompetitionId": 441934,
+      "teamPermanentId": 154713,
+      "teamname": "TV Bretten TITANS",
+      "teamnameSmall": "TVB",
+      "clubId": 484,
+      "verzicht": false
+     },
+     "anzspiele": 1,
+     "anzGewinnpunkte": 0,
+     "anzVerlustpunkte": 0,
+     "s": 0,
+     "n": 1,
+     "koerbe": 58,
+     "gegenKoerbe": 65,
+     "korbdiff": -7
+    },
+    {
+     "rang": 10,
+     "team": {
+      "seasonTeamId": 441931,
+      "teamCompetitionId": 441931,
+      "teamPermanentId": 316303,
+      "teamname": "SG Eichenkreuz Karlsruhe 4",
+      "teamnameSmall": "SGEK4",
+      "clubId": 886,
+      "verzicht": false
+     },
+     "anzspiele": 1,
+     "anzGewinnpunkte": 0,
+     "anzVerlustpunkte": 0,
+     "s": 0,
+     "n": 1,
+     "koerbe": 66,
+     "gegenKoerbe": 95,
+     "korbdiff": -29
+    }
+   ],
+   "bbl": false
+  },
+  "kreuztabelle": null,
+  "teamStatistik": null
+ },
+ "version": "12.01.0-4a6771b",
+ "dateFormat": "yyyy-MM-dd",
+ "timeFormat": "yyyy-MM-dd'T'HH:mm:ssZ",
+ "timeFormatShort": "HH:mm",
+ "serverInstance": "www",
+ "username": null,
+ "appContext": "https://www.basketball-bund.net"
+}

@@ -53,6 +53,23 @@ services:
     networks: [internal]
     logging: *logging
 
+  # Sync Verbandsdaten – nur auf Aufruf (Profil "sports"), spricht PocketBase im internen Netz an.
+  # Eigenes Superuser-Konto nur für den Sync (SPORTS_SYNC_PB_*), damit es getrennt widerrufbar ist.
+  sports-sync:
+    profiles: [sports]
+    build:
+      context: ..
+      dockerfile: deploy/sports-sync/Dockerfile
+    image: trainerhub-sports-sync:${TRAINERHUB_IMAGE_TAG:-local}
+    depends_on:
+      pocketbase: { condition: service_healthy }
+    environment:
+      PB_URL: http://pocketbase:8090
+      PB_SUPERUSER_EMAIL: ${SPORTS_SYNC_PB_EMAIL:-}
+      PB_SUPERUSER_PASSWORD: ${SPORTS_SYNC_PB_PASSWORD:-}
+    networks: [internal]
+    logging: *logging
+
 networks:
   internal:
     name: ${COMPOSE_PROJECT_NAME:-trainerhub-staging}_internal

@@ -22,11 +22,11 @@ export default [
       ...reactHooks.configs.recommended.rules,
       "react/prop-types": "off",
       "react/no-unescaped-entities": "off",
-      "no-unused-vars": ["error", { varsIgnorePattern: "^_", argsIgnorePattern: "^_" }],
+      "no-unused-vars": ["error", { varsIgnorePattern: "^_", argsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }],
     },
   },
   {
-    files: ["scripts/**", "test/**", "e2e/**", "vite.config.js", "vitest*.config.js", "eslint.config.js", "**/*.test.js"],
+    files: ["scripts/**", "server/**", "test/**", "e2e/**", "vite.config.js", "vitest*.config.js", "eslint.config.js", "**/*.test.js"],
     languageOptions: { globals: { ...globals.node } },
   },
   {

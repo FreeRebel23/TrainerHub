@@ -1,0 +1,128 @@
+{
+ "timestamp": "2026-09-27T09:30:36+0200",
+ "status": "0",
+ "message": "",
+ "data": {
+  "ligaData": {
+   "seasonId": 2026,
+   "seasonName": "2026/2027",
+   "actualMatchDay": {
+    "spieltag": 1,
+    "bezeichnung": "1. Spieltag"
+   },
+   "ligaId": 53074,
+   "liganame": "BBW2 Kreisliga A Nord Männer ",
+   "liganr": 72601,
+   "skName": "Kreisliga A",
+   "skNameSmall": null,
+   "skEbeneId": 2,
+   "skEbeneName": "Kreis",
+   "akName": "Senioren",
+   "geschlechtId": 1,
+   "geschlecht": "männlich",
+   "verbandId": 1,
+   "verbandName": "Baden-Württemberg",
+   "bezirknr": 2,
+   "bezirkName": "SchwarzwaldOberrhein",
+   "kreisnr": null,
+   "kreisname": null,
+   "statisticType": 1,
+   "vorabliga": false,
+   "tableExists": true,
+   "crossTableExists": true
+  },
+  "matchId": 2946251,
+  "matchDay": 1,
+  "matchNo": 19602,
+  "kickoffDate": "2026-09-26",
+  "kickoffTime": "09:30",
+  "homeTeam": {
+   "seasonTeamId": 450814,
+   "teamCompetitionId": 450814,
+   "teamPermanentId": 167085,
+   "teamname": "TSV Ettlingen 4",
+   "teamnameSmall": "TSVE",
+   "clubId": 809,
+   "verzicht": false
+  },
+  "guestTeam": {
+   "seasonTeamId": 441934,
+   "teamCompetitionId": 441934,
+   "teamPermanentId": 154713,
+   "teamname": "TV Bretten TITANS",
+   "teamnameSmall": "TVB",
+   "clubId": 484,
+   "verzicht": false
+  },
+  "result": "65:58",
+  "ergebnisbestaetigt": false,
+  "statisticType": 1,
+  "verzicht": false,
+  "abgesagt": false,
+  "matchResult": {
+   "heimEndstand": 65,
+   "gastEndstand": 58,
+   "heimHalbzeitstand": 13,
+   "gastHalbzeitstand": 10,
+   "heimV1stand": 13,
+   "gastV1stand": 10,
+   "heimV3stand": 17,
+   "gastV3stand": 10,
+   "heimV4stand": 22,
+   "gastV4stand": 28,
+   "heimOt1stand": null,
+   "gastOt1stand": null,
+   "heimOt2stand": null,
+   "gastOt2stand": null
+  },
+  "matchInfo": {
+   "topPerformances": [
+    {
+     "performance": "Punkte",
+     "playerA": {
+      "playerId": 800001,
+      "no": "10",
+      "person": {
+       "id": 900002,
+       "vorname": "Vorname2",
+       "nachname": "Nachname2",
+       "anonym": false
+      },
+      "anonym": false
+     },
+     "playerB": {
+      "playerId": 800003,
+      "no": "22",
+      "person": {
+       "id": 900004,
+       "vorname": "Vorname4",
+       "nachname": "Nachname4",
+       "anonym": false
+      },
+      "anonym": false
+     },
+     "performanceA": 0.0,
+     "performanceB": 0.0
+    }
+   ],
+   "spielfeld": {
+    "id": 1083,
+    "bezeichnung": "Albgauhalle",
+    "strasse": "Middelkerkerstraße",
+    "plz": "76275",
+    "ort": "Ettlingen"
+   },
+   "srList": []
+  },
+  "matchBoxscore": null,
+  "playByPlay": null,
+  "hasPlayByPlay": false
+ },
+ "version": "12.01.0-4a6771b",
+ "dateFormat": "yyyy-MM-dd",
+ "timeFormat": "yyyy-MM-dd'T'HH:mm:ssZ",
+ "timeFormatShort": "HH:mm",
+ "serverInstance": "www",
+ "username": null,
+ "appContext": "https://www.basketball-bund.net"
+}
