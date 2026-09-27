@@ -46,7 +46,7 @@ Docker-Stack in `deploy/` verwenden (siehe `docs/PHASE3_SYNC_AND_SERVER.md`).
 | `deploy/` | Docker-Compose-Stack, nginx für die PWA, Backup/Restore/Deploy/Status, read-only Server-Inspektion |
 | `scripts/pb-admin.mjs` | Verein, Abteilung, Konten, Teams und Zugriffe verwalten |
 | `test/integration/`, `e2e/` | Integrationstests (echte PocketBase) und Browser-Ende-zu-Ende |
-| `docs/` | Architektur, UX-Refresh, Phase 2, Phase 3 (Sync & Server), Hetzner-Handoff |
+| `docs/` | Architektur, UX-Refresh, Phase 2, Phase 3 (Sync & Server), Sports Data, Phase 4 (Team Workspace), Hetzner-Handoff |
 
 Daten liegen lokal unter `localStorage["trainerhub_v1"]`, die Theme-Wahl unter
 `localStorage["trainerhub_theme"]`, der Entwurf eines laufenden Trainings unter
@@ -61,5 +61,7 @@ Daten liegen lokal unter `localStorage["trainerhub_v1"]`, die Theme-Wahl unter
   Saisonübersicht – siehe `docs/PHASE2_TRAINING_WORKFLOW.md`
 - ✅ Zentraler Sync, Konten, Team-Rechte, Erstübernahme, Docker-Stack (Phase 3) – siehe
   `docs/PHASE3_SYNC_AND_SERVER.md`; Staging auf Hetzner: `docs/HETZNER_DEPLOYMENT_HANDOFF.md`
+- 🔄 Phase 4 (Branch `trainerhub-phase4-team-workspace`): Team Workspace, Saisonkader, Spielerprofil,
+  Beobachtungen im Training – siehe `docs/PHASE4_TEAM_WORKSPACE.md`
 
 Leitbild und Prinzipien: [`NORTH_STAR.md`](NORTH_STAR.md).

@@ -62,6 +62,11 @@ Collections für Spielbetrieb & Verbandsdaten** hinzu (`team_links`, `competitio
 `games`, `standings`, `basketball_player_game_stats`, `player_links`, `sync_runs`) – serverseitig
 befüllt, nicht Teil des Offline-Syncs der App. Details: [SPORTS_DATA_ARCHITECTURE.md](SPORTS_DATA_ARCHITECTURE.md).
 
+Ab Migration `1760000400_team_workspace.js` (Phase 4) kommen **`roster_entries`** (Saisonkader) und
+**`observations`** (Trainerbeobachtungen) als normale Sync-Collections hinzu, `seasons` erhält `goals`;
+`games`/`competitions` lädt die App nur lesend. Außerdem sieht ein coach seitdem nur Personen seiner
+Teams. Details: [PHASE4_TEAM_WORKSPACE.md](PHASE4_TEAM_WORKSPACE.md).
+
 Entscheidungen:
 
 - **Planung und Training bleiben getrennt** (Phase-2-Entscheidung). Die Verknüpfung liegt
