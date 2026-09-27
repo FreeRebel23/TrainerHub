@@ -4,11 +4,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { startPocketBase, seedTenants, PASSWORD } from "./harness.js";
 import { createClient } from "../../src/sync/client.js";
-import { createWorld } from "../fixtures/basketball-bund/world.js";
-import { politeHttp } from "../../server/sports/http.js";
-import { createBasketballBundProvider, PROVIDER } from "../../server/sports/providers/basketball-bund.js";
-import { pocketbaseStore } from "../../server/sports/store.js";
-import { syncSection, syncAll, MISSING_THRESHOLD } from "../../server/sports/sync.js";
+import { createWorld } from "../../packages/sports-data/test/fixtures/world.js";
+import { politeHttp, createBasketballBundProvider, basketballBund } from "../../packages/sports-data/src/index.js";
+import { pocketbaseStore } from "../../server/trainerhub-sports/store.js";
+import { syncSection, syncAll, MISSING_THRESHOLD } from "../../server/trainerhub-sports/sync.js";
+
+const { PROVIDER } = basketballBund;
 
 const CLUB = 484, OPP1 = 800, OPP2 = 801;
 const NOW = new Date("2026-09-27T08:00:00Z");

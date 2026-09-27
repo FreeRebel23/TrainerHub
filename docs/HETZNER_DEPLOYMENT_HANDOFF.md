@@ -321,6 +321,20 @@ von Staging durch die lokale Claude-Code-Session mit SSH-Zugang.
 | GitHub-Staging-Deploy | **deaktiviert** (keine Variable `STAGING_DEPLOY_ENABLED`, keine Secrets; Deploy-Job wird übersprungen) |
 | Update-Prozess | `cd /opt/trainerhub-staging && sudo git fetch && sudo git checkout <commit> && cd deploy && sudo ./scripts/deploy.sh` |
 
+### Stand Spielbetrieb-Prototyp (27.09.2026)
+
+- Staging läuft auf dem Branch `trainerhub-phase3-sports-data` (Migration `1760000300_sports_data`,
+  rein additiv). Vor dem Update hat `deploy.sh` ein Backup erstellt. Rückweg:
+  `git checkout 5ef9ce7 && ./scripts/deploy.sh` (die neuen Collections bleiben dann ungenutzt).
+- Eigenes Superuser-Konto nur für den Sync (`SPORTS_SYNC_PB_EMAIL/PASSWORD` in `deploy/.env`,
+  Passwort auf dem Server erzeugt, nirgends ausgegeben). Widerruf: das Konto im Dashboard löschen.
+- Compose-Dienst `sports-sync` (Profil `sports`, läuft nur auf Aufruf). **Kein Cron eingerichtet.**
+- Zugeordnet ist nur **U16w** ↔ `teamPermanentId` 189841 (Verein 484), nicht veröffentlicht
+  (`publish = false`). Ergebnis des ersten Laufs: 12 Spiele, 1 Tabelle, 2 Hallen, 5 Anfragen.
+  Der zweite Lauf war idempotent (3 Anfragen, 12 Spiele unverändert).
+- Befehle: `cd /opt/trainerhub-staging/deploy && sudo docker compose --profile sports run --rm -T sports-sync status|run …`
+  (siehe `docs/SPORTS_DATA_ARCHITECTURE.md` §18).
+
 ### Angelegte Struktur und Berechtigungen (ohne Zugangsdaten)
 
 Stand nach Migration `1760000200_permission_profiles` (Staging-Update auf `5ef9ce7`, 26.09.2026):

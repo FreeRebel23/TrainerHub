@@ -1,4 +1,6 @@
-// Sync Verbandsquelle → TrainerHub (idempotent, je Abteilung).
+// TrainerHub-Adapter der Capability packages/sports-data: schreibt normalisierte Objekte
+// (packages/sports-data/src/model.js) idempotent nach PocketBase, je Abteilung. Der Provider wird
+// injiziert; dieses Modul kennt weder das Quellformat noch HTTP.
 //
 // Ablauf eines Laufs für eine Abteilung (section):
 //   1. Entdeckung (nur mode "full"): Vereinsspiele der nächsten Wochen → für jede per team_links

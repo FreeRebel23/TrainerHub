@@ -1,4 +1,4 @@
-// Höflicher HTTP-Client für externe Verbandsquellen:
+// Höflicher HTTP-Client für externe Verbandsquellen (Teil von packages/sports-data):
 //   – streng nacheinander (keine Parallelität), Mindestabstand zwischen zwei Anfragen
 //   – Timeout, wenige Wiederholungen nur bei Netzwerkfehlern/5xx/429, mit Pause
 //   – Antwort-Cache pro Lauf (dieselbe URL wird in einem Lauf nur einmal abgerufen)
@@ -14,7 +14,8 @@ export class ProviderError extends Error {
   }
 }
 
-export const DEFAULT_USER_AGENT = "TrainerHub-Sync/1.0 (TV Bretten Basketball; Vereinsverwaltung, seltene Abrufe)";
+// Verbraucher setzen einen eigenen, ehrlichen User-Agent (z. B. „TrainerHub-Sync/1.0 …“, „GameDay/…“)
+export const DEFAULT_USER_AGENT = "sports-data/1.0 (Vereinsnutzung, seltene Abrufe)";
 
 export function politeHttp({
   baseUrl, fetchImpl = fetch, minIntervalMs = 1500, timeoutMs = 15000, retries = 2,

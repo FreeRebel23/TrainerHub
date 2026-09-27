@@ -1,4 +1,4 @@
-# Spielbetrieb & Verbandsdaten – Architektur
+# Spielbetrieb & Verbandsdaten – Architektur (Capability `sports-data` + TrainerHub-Adapter)
 
 > **Leitsatz:** Externe Verbandsdaten werden einmal sauber synchronisiert und stehen danach allen
 > TrainerHub-Modulen und angeschlossenen Diensten als gemeinsame Wahrheit zur Verfügung.
@@ -7,24 +7,30 @@
 Stand: 27.09.2026, Branch `trainerhub-phase3-sports-data`. Prototyp mit Tests. Die Berechtigungsprofile
 sind unverändert, ebenso alle bestehenden Collections.
 
+**Zielprinzip: Separate Products, Shared Capabilities.** Die Verbandsdaten-Schicht gehört keinem
+Produkt. GameDay funktioniert vollständig ohne TrainerHub, und TrainerHub braucht GameDay nicht.
+
 ```
 basketball-bund.net (/rest, öffentlich)
         │  höflich: nacheinander, Pausen, Cache je Lauf
         ▼
-Provider-Adapter  server/sports/providers/basketball-bund.js   ← einzige Stelle, die das Quellformat kennt
-        │  normalisierte, provider-neutrale Objekte
-        ▼
-Sync  server/sports/sync.js  (idempotent, je Abteilung, Superuser im internen Netz)
-        │
-        ▼
+┌─ packages/sports-data ── produktneutrale Capability (keine PocketBase/React/TrainerHub/GameDay) ─┐
+│  Provider-Adapter  src/providers/basketball-bund.js   ← einzige Stelle, die das Quellformat kennt │
+│  HTTP src/http.js · Vertrag src/model.js (SCHEMA_VERSION 1) · Namen src/names.js                 │
+│  Einstieg: src/index.js (JS) · bin/sports-data.mjs (JSON-CLI für jede Sprache)                   │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+        │  normalisierte Domänenobjekte
+   ┌────┴─────────────────────────────┐
+   ▼                                  ▼
+TrainerHub-Adapter                    GameDay-Adapter (im GameDay-Repo, später)
+server/trainerhub-sports              ruft die Capability direkt auf (CLI/JSON oder JS)
+(Sync, Store, Spielerzuordnung)       → Rendering/Publishing, ohne TrainerHub
+   ▼
 PocketBase  team_links · competitions · team_competitions · games · standings ·
             basketball_player_game_stats · player_links · sync_runs
-        │                                   │
-        ▼                                   ▼
-TrainerHub-App (angemeldet, Regeln)     öffentlicher Feed v1  /api/trainerhub/sports/v1/…
-                                            │
-                                            ▼
-                                  GameDay · Scoreboard (eigene Dienste)
+   │                                  ┆
+   ▼                                  ┆ optional, keine Voraussetzung
+TrainerHub-App (angemeldet, Regeln)   öffentlicher TrainerHub-Feed v1  /api/trainerhub/sports/v1/…
 ```
 
 ---
@@ -67,18 +73,46 @@ Fixture im Test).
 
 ## 2. Provider-Adapter
 
-`server/sports/providers/basketball-bund.js`, `createBasketballBundProvider({ http })` liefert:
+`packages/sports-data/src/providers/basketball-bund.js`, `createBasketballBundProvider({ http })` liefert:
 
 - `clubMatches(clubId)`, `schedule(ligaId)`, `standings(ligaId)`, `gameDetails(matchId)`, `boxscore(matchId)`, `seasonFor(date)`
 - reine Normalisierer (`normalizeMatch`, `normalizePeriods`, `normalizeStandings`, `normalizeBoxscoreSide`), einzeln getestet
 
-Der Sync kennt nur die normalisierten Objekte. Ein zweiter Provider (z. B. Handballverband) braucht
+Der TrainerHub-Sync (`server/trainerhub-sports/sync.js`) kennt nur die normalisierten Objekte (`model.js`). Ein zweiter Provider (z. B. Handballverband) braucht
 einen weiteren Adapter mit derselben Schnittstelle. Datenmodell und Sync bleiben gleich.
 
-HTTP (`server/sports/http.js`): streng nacheinander, mindestens 1,5 s Abstand, 15 s Timeout, höchstens
+HTTP (`packages/sports-data/src/http.js`): streng nacheinander, mindestens 1,5 s Abstand, 15 s Timeout, höchstens
 2 Wiederholungen und nur bei Netzwerkfehler/5xx/429 (mit Pause), bei 4xx keine Wiederholung.
 Außerdem gibt es einen Cache je Lauf und einen ehrlichen User-Agent. Es gibt keine Maßnahmen gegen
 Zugangsschutz oder Schutzmechanismen, und es werden nur die nötigen Seiten abgerufen.
+
+## 2a. Produktgrenze: Capability vs. Produkt-Adapter
+
+| Ebene | Ort | darf kennen | darf **nicht** kennen |
+|---|---|---|---|
+| **Capability** (geteilt) | `packages/sports-data/` | Quellformat, HTTP, Provider-IDs, Normalisierung, Spielplan, Ergebnisse, Viertel, Tabellen, Basketballstatistik, Vertrag `model.js` | PocketBase, React, TrainerHub-Collections/-Teams/-Rechte, GameDay-Layouts, Speicherung, „eigene“ Mannschaft |
+| **TrainerHub-Adapter** | `server/trainerhub-sports/` (`sync.js`, `store.js`, `players.js`), `scripts/sports-sync.mjs`, Migration, Feed | TrainerHub-Datenmodell, Mandanten, Team-/Spielerzuordnung, PocketBase | Quellformat (nur über den Vertrag) |
+| **GameDay-Adapter** (später, im GameDay-Repo) | z. B. `GAMEDAY/src/adapters/sports_data.py` | Vertrag (JSON), eigene Vereins-/Teamkonfiguration, Rendering/Publishing | TrainerHub, PocketBase |
+
+Regeln:
+
+- Die Capability importiert **nur** `node:`-Module und eigene Dateien und hat **keine**
+  npm-Abhängigkeiten. Das ist automatisch geprüft (`packages/sports-data/test/boundary.test.js`,
+  läuft in `npm test`/CI).
+- Produkte nutzen nur die öffentlichen Einstiege: `src/index.js` bzw. `bin/sports-data.mjs`.
+- Jedes Produkt setzt seinen eigenen, ehrlichen User-Agent und steuert seine Abrufe selbst
+  (Frequenz, Umfang). Die Capability erzwingt nur die Höflichkeit je Prozess.
+- Vertragsänderungen, die Verbraucher brechen, erhöhen `SCHEMA_VERSION`. Die CLI gibt die Version
+  in jeder Antwort mit aus.
+- Extraktion: Das Verzeichnis `packages/sports-data` ist mit `package.json` (keine Abhängigkeiten),
+  README, Tests und Fixtures bereits eigenständig. Als eigenes Repository/npm-Paket lässt es sich
+  ohne Rewrite verschieben. Nur die Importpfade der TrainerHub-Stellen (`scripts/sports-sync.mjs`,
+  `server/trainerhub-sports/players.js`, Integrationstest) ändern sich.
+- **GameDay (Python)** kann die Capability heute schon ohne TrainerHub nutzen: per
+  `node packages/sports-data/bin/sports-data.mjs club-games --club 484 --details` (JSON auf stdout).
+  Langfristig kommt die Capability als eigenes Paket/Repository dazu, oder – falls GameDay
+  Node-frei bleiben soll – eine Python-Implementierung desselben Vertrags (`model.js` ist der
+  sprachneutrale Maßstab, die anonymisierten Fixtures dienen als gemeinsame Konformitätstests).
 
 ## 3. Externe IDs
 
@@ -219,7 +253,7 @@ externalName, points, twoPointersMade, threePointersMade, freeThrowsMade, freeTh
 ## 11. Spielerzuordnung
 
 Reihenfolge: **(1)** stabile externe Personen-ID mit bestätigter Zuordnung (`player_links`) →
-**(2)** sonst bleibt `player` leer. Namen erzeugen nur **Vorschläge** (`server/sports/players.js`,
+**(2)** sonst bleibt `player` leer. Namen erzeugen nur **Vorschläge** (`server/trainerhub-sports/players.js` auf Basis von `nameCandidates` der Capability,
 `sports-sync.mjs players`). Es wird **nie automatisch** über Namen zugeordnet.
 Gibt es zwei gleiche Namen, ist der Vorschlag „mehrdeutig“ (getestet). Bestätigen können Berechtigte
 der Abteilung über die API (`confirmedBy` muss das eigene Konto sein) oder der Admin per
@@ -280,15 +314,25 @@ Die Cron-Einträge sind **noch nicht eingerichtet**. Das ist erst nach Abnahme d
 
 ## 15. Anbindung GameDay / Scoreboard
 
-Richtung: **Verbandsquelle → TrainerHub → GameDay/Scoreboard.** GameDay bleibt ein eigener Dienst und
-liest statt basketball-bund.net künftig den TrainerHub-Feed.
+GameDay ist ein eigenständiges Produkt, eine sportartenübergreifende Content-Production- und
+Publishing-Engine. TrainerHub ist ein möglicher Integrationspartner, aber keine Voraussetzung.
 
-Ich habe mich für eine **kleine öffentliche Route in PocketBase** entschieden
-(`pocketbase/pb_hooks/sports_feed.js`) und gegen öffentliche Collection-Regeln. Gründe:
+**Primärer Weg – ohne TrainerHub:** GameDay nutzt die Capability `packages/sports-data` direkt
+(JSON-CLI oder später als Paket bzw. Python-Implementierung desselben Vertrags, siehe §2a). GameDay
+pflegt dafür seine eigene Konfiguration (Verein `clubId`, Mannschaften über `teamPermanentId` →
+eigene Anzeigenamen) und entscheidet selbst über Abrufzeitpunkte. Damit ersetzt GameDay seinen
+HTML-Scraper, der `Action=103` nutzt (per robots.txt gesperrt) und über Namen zuordnet.
 
-- Eine Collection-Regel gibt immer den ganzen Datensatz frei, die Route nur eine feste Feldliste.
-- Der Vertrag ist stabil und versioniert (`v1`), unabhängig vom internen Schema.
-- Veröffentlicht wird **je Team ausdrücklich** (`team_links.publish`, Standard aus).
+**Optionaler Weg – über TrainerHub:** Betreibt ein Verein beide Produkte, kann GameDay auch die schon
+synchronisierten Daten aus TrainerHub lesen (dann ein Abruf der Quelle statt zweier). Dafür gibt es
+eine kleine öffentliche Route in PocketBase (`pocketbase/pb_hooks/sports_feed.js`). Sie ist
+**eine** Integrationsmöglichkeit, nicht die einzige: GameDay darf davon nicht abhängig werden. Der
+Feed liefert deshalb dieselben Begriffe wie der Capability-Vertrag (Spiel, Abschnitte, Tabelle),
+sodass ein GameDay-Adapter beide Quellen gleich behandeln kann.
+
+Die Route ist eine öffentliche Collection-Regel vorgezogen, weil sie nur eine feste Feldliste
+freigibt, einen stabilen, versionierten Vertrag (`v1`) hat und je Team ausdrücklich veröffentlicht
+wird (`team_links.publish`, Standard aus).
 
 ```
 GET /api/trainerhub/sports/v1/games?section=<id>[&from=YYYY-MM-DD&to=YYYY-MM-DD]   (Standard: −14 … +60 Tage)
@@ -306,8 +350,7 @@ GET /api/trainerhub/sports/v1/standings?section=<id>
 Der Feed enthält keine Personen, Trainings- oder Teamobjekte (getestet). Er ist cachebar
 (`Cache-Control` 2 bzw. 5 min) und bewusst ohne Anmeldung, weil er nur Daten enthält, die ohnehin
 öffentlich beim Verband stehen. GameDay braucht dann nur noch die Abteilungs-ID und den Teamnamen
-(`home.team.name` = interner Name wie „U16w“ statt Namensraten). Die GameDay-Seite (`src/adapters/`)
-kann auf einen `TrainerHubAdapter` umgestellt werden. Das ist ein eigener Schritt in GameDay.
+(`home.team.name` = interner Name wie „U16w“ statt Namensraten).
 
 ## 16. ArcShot-Perspektive
 
@@ -333,7 +376,7 @@ geschrieben.
   erhalten getrennte Datensätze (getestet).
 - Testdaten: Die Fixtures sind aus echten Antworten anonymisiert (Personen ersetzt,
   Schiedsrichter:innen entfernt). Die Sync-Tests laufen gegen eine erfundene „Verbandswelt“
-  (`test/fixtures/basketball-bund/world.js`).
+  (`packages/sports-data/test/fixtures/world.js`).
 
 ## 18. Betrieb (Kurzreferenz)
 
@@ -346,15 +389,21 @@ node scripts/sports-sync.mjs players --team U16w --org "TV Bretten"
 node scripts/sports-sync.mjs publish --team U16w --org "TV Bretten" --on
 ```
 
-Auf dem Server laufen die Befehle als `docker compose --profile sports run --rm sports-sync <befehl> …`
+Produktneutral, ohne TrainerHub: `node packages/sports-data/bin/sports-data.mjs <befehl>` (siehe
+`packages/sports-data/README.md`).
+
+Auf dem Server laufen die TrainerHub-Befehle als `docker compose --profile sports run --rm sports-sync <befehl> …`
 (Image `deploy/sports-sync/Dockerfile`, kein dauerhaft laufender Dienst).
 
 ## 19. Tests
 
-- Unit (`server/sports/adapter.test.js`, 12): Normalisierung anhand anonymisierter echter Antworten,
+- Capability (`packages/sports-data/test/`, 14 + 3 Grenztests): Normalisierung anhand anonymisierter echter Antworten,
   Viertel (einzeln/kumuliert/OT/unstimmig), Tabelle, leerer Boxscore, `00:00`, abgesagt, Freilos,
   unbekannter Wettbewerb, Saisongrenze, höflicher HTTP-Client (seriell, Abstand, Cache, Retry nur
-  5xx), Spielerzuordnung (Vorschlag, mehrdeutig, Vorrang externe ID).
+  5xx), Namensvorschläge, Schema-Version; Modulgrenze (nur `node:`/eigene Importe, keine Produktbezüge,
+  keine Abhängigkeiten).
+- TrainerHub-Adapter (`server/trainerhub-sports/players.test.js`, 2): Spielerzuordnung (Vorschlag,
+  mehrdeutig, Vorrang externe ID).
 - Integration (`test/integration/sports.test.js`, 24, echte PocketBase): ohne Zuordnung kein Import,
   Team-Mapping, Wettbewerbs-Mapping, mehrere Wettbewerbe je Team, unbekannte Mannschaft,
   wiederholter Sync ohne Duplikate, Verlegung, Ergebnis + Viertel + Verlängerung, Ergebniskorrektur,
@@ -377,6 +426,9 @@ Auf dem Server laufen die Befehle als `docker compose --profile sports run --rm 
 4. Nutzungsbedingungen von basketball-bund.net zur automatisierten Nutzung der `/rest`-Schnittstelle
    klären (robots.txt schließt sie nicht aus; eine ausdrückliche Erlaubnis liegt nicht vor). Bei
    Unsicherheit beim DBB/BBW nachfragen.
-5. GameDay ruft heute selbst `Action=103` ab (per robots.txt gesperrt). Empfehlung: GameDay auf den
-   TrainerHub-Feed umstellen.
+5. GameDay ruft heute selbst `Action=103` ab (per robots.txt gesperrt). Empfehlung: GameDay-Adapter auf
+   die Capability `packages/sports-data` umstellen (direkt, ohne TrainerHub). Die Entscheidung JSON-CLI
+   vs. Python-Portierung des Vertrags fällt in GameDay.
+7. Extraktion von `packages/sports-data` in ein eigenes Repository/Paket, sobald ein zweites Produkt
+   es produktiv nutzt.
 6. Minimale Admin-Oberfläche (Zuordnungen, letzter Lauf) in der App – derzeit genügt das CLI.

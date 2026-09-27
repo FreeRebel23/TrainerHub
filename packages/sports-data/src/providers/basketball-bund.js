@@ -1,23 +1,26 @@
-// Provider-Adapter basketball-bund.net (TeamSL). Einzige Stelle, die das Format der Quelle kennt.
-// Liefert normalisierte, provider-neutrale Objekte; alles Weitere (Mapping, Speicherung) passiert
-// im Sync und kennt die Quelle nicht.
+// Provider-Adapter basketball-bund.net (TeamSL) – Teil der produktneutralen Capability
+// packages/sports-data. Einzige Stelle, die das Format der Quelle kennt. Liefert normalisierte
+// Domänenobjekte (Vertrag: ../model.js); Speicherung, Mapping auf eigene Teams und Darstellung
+// sind Sache der Verbraucher (TrainerHub → PocketBase, GameDay → Rendering/Publishing).
+// Keine Abhängigkeiten außer Node-Bordmitteln und Modulen dieses Pakets.
 //
 // Verwendet ausschließlich die öffentliche JSON-Schnittstelle /rest/…, die auch die Webseite selbst
 // nutzt und die robots.txt nicht ausschließt. Die HTML-Ergebnisseiten index.jsp?Action=103/106,
 // das Archiv und statistik.do?reqCode=statTeam sind per robots.txt gesperrt und werden nicht
-// verwendet. Details und verifizierte Beispiele: docs/SPORTS_DATA_ARCHITECTURE.md.
+// verwendet. Details und verifizierte Beispiele: packages/sports-data/README.md.
 //
-// Stabile IDs der Quelle
-//   ligaId            Wettbewerb einer Saison               → competitions.externalId
-//   matchId           Spiel (global eindeutig)               → games.externalId
-//   matchNo           Spielnummer (nur je Liga eindeutig)    → games.matchNo (Anzeige/Abgleich)
-//   teamPermanentId   Mannschaft, wettbewerbsübergreifend    → team_links.externalTeamId
-//   seasonTeamId      Mannschaft in genau einem Wettbewerb   → team_competitions.externalTeamId
-//   clubId            Verein                                 → team_links.externalClubId
-//   person.id         Person (Spieler:in)                    → player_links/… externalPlayerId
-//   spielfeld.id      Halle                                  → games.venueExternalId
+// Stabile IDs der Quelle → Feld im normalisierten Objekt
+//   ligaId            Wettbewerb einer Saison               → Competition.externalId
+//   matchId           Spiel (global eindeutig)               → Game.externalId
+//   matchNo           Spielnummer (nur je Liga eindeutig)    → Game.matchNo (Anzeige/Abgleich)
+//   teamPermanentId   Mannschaft, wettbewerbsübergreifend    → TeamRef.externalId
+//   seasonTeamId      Mannschaft in genau einem Wettbewerb   → TeamRef.seasonTeamId
+//   clubId            Verein                                 → TeamRef.clubId
+//   person.id         Person (Spieler:in)                    → PlayerGameStat.externalPlayerId
+//   spielfeld.id      Halle                                  → Venue.externalId
 
 import { ProviderError, politeHttp } from "../http.js";
+import { SCHEMA_VERSION } from "../model.js";
 
 export const PROVIDER = "basketball-bund";
 export const BASE_URL = "https://www.basketball-bund.net";
@@ -82,7 +85,7 @@ export function normalizeMatch(m, liga = m?.ligaData) {
   if (!home || !away) return null;   // spielfrei / Freilos: kein Spiel
   const score = parseScore(m.result);
   // Status nur aus dem, was die Quelle liefert: abgesagt → cancelled, Ergebnis → finished.
-  // Eine „verlegt“-Kennzeichnung liefert die JSON-Quelle nicht; Verlegungen erkennt der Sync an
+  // Eine „verlegt“-Kennzeichnung liefert die JSON-Quelle nicht; Verlegungen erkennt der Verbraucher an
   // einem geänderten Datum desselben Spiels.
   const status = m.abgesagt ? "cancelled" : score ? "finished" : "planned";
   return {
@@ -153,7 +156,7 @@ export function normalizeStandings(tabelle) {
   }));
 }
 
-// Boxscore einer Mannschaft. Nur Werte, die TrainerHub braucht und die die Quelle liefert.
+// Boxscore einer Mannschaft. Nur Werte, die die Quelle liefert (Vertrag: PlayerGameStat).
 // Liefert die Quelle für die Mannschaft ausschließlich Nullen (typisch, solange kein Statistikbogen
 // erfasst ist), gilt das als „keine Statistik“ – es werden keine Schein-Nullen gespeichert.
 export function normalizeBoxscoreSide(list) {
@@ -184,6 +187,7 @@ export function createBasketballBundProvider({ http = politeHttp({ baseUrl: BASE
   const get = async path => unwrap(await http.getJson(path), path);
   return {
     id: PROVIDER,
+    schemaVersion: SCHEMA_VERSION,
     http,
 
     // Saison-ID der Quelle für einen Kalendertag: Saison beginnt am 1. Juli (2026-09-27 → "2026" = 2026/2027)
@@ -192,8 +196,8 @@ export function createBasketballBundProvider({ http = politeHttp({ baseUrl: BASE
       return String(m >= 7 ? y : y - 1);
     },
 
-    // Spiele eines Vereins im nahen Zeitraum (Quelle begrenzt auf ca. drei Wochen) – dient der
-    // Entdeckung, in welchen Wettbewerben eine zugeordnete Mannschaft gerade spielt.
+    // Spiele eines Vereins im nahen Zeitraum (Quelle begrenzt auf ca. drei Wochen) – zeigt, in
+    // welchen Wettbewerben die Mannschaften eines Vereins gerade spielen.
     async clubMatches(clubId, { rangeDays = 21 } = {}) {
       const data = await get(`/rest/club/id/${encodeURIComponent(clubId)}/actualmatches?justHome=false&rangeDays=${rangeDays}`);
       return (data?.matches ?? []).map(m => ({ competition: normalizeCompetition(m.ligaData), game: normalizeMatch(m) }))
@@ -218,7 +222,7 @@ export function createBasketballBundProvider({ http = politeHttp({ baseUrl: BASE
       return { game: normalizeMatch(data), periods: normalizePeriods(data?.matchResult), venue: normalizeVenue(data?.matchInfo) };
     },
 
-    // Spielerwerte beider Mannschaften (Zuordnung zur eigenen Seite macht der Sync)
+    // Spielerwerte beider Mannschaften (welche Seite „eigen“ ist, entscheidet der Verbraucher)
     async boxscore(gameId) {
       const data = await get(`/rest/match/id/${encodeURIComponent(gameId)}/boxscore`);
       const b = data?.matchBoxscore;

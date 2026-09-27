@@ -1,12 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { politeHttp, ProviderError } from "./http.js";
-import { createBasketballBundProvider, normalizeMatch, normalizePeriods, normalizeStandings, normalizeBoxscoreSide, parseScore } from "./providers/basketball-bund.js";
-import { assignmentState, suggestPlayers, normalizeName } from "./players.js";
-import { createWorld } from "../../test/fixtures/basketball-bund/world.js";
+import { politeHttp, ProviderError, createBasketballBundProvider, basketballBund, normalizeName, nameCandidates, SCHEMA_VERSION } from "../src/index.js";
+import { createWorld } from "./fixtures/world.js";
 
-const FIX = join(import.meta.dirname, "../../test/fixtures/basketball-bund");
+const { normalizeMatch, normalizePeriods, normalizeStandings, normalizeBoxscoreSide, parseScore } = basketballBund;
+const FIX = join(import.meta.dirname, "fixtures");
 const fixture = name => JSON.parse(readFileSync(join(FIX, name), "utf8"));
 const fastHttp = fetchImpl => politeHttp({ baseUrl: "https://example.test", fetchImpl, minIntervalMs: 0, sleep: async () => {} });
 
@@ -104,16 +103,18 @@ describe("höflicher HTTP-Client", () => {
   });
 });
 
-describe("Spieler-Zuordnung: nie automatisch über Namen", () => {
-  const players = [{ id: "p1", name: "Lena Muster" }, { id: "p2", name: "Lena Muster" }, { id: "p3", name: "Mia Beispiel" }];
-  it("Namen liefern nur Vorschläge; gleiche Namen sind mehrdeutig", () => {
+describe("Namen nur als Vorschlag", () => {
+  it("normalisiert und findet auch „Nachname Vorname“, gleiche Namen bleiben mehrdeutig", () => {
+    const people = [{ name: "Lena Muster" }, { name: "Lena Muster" }, { name: "Mia Beispiel" }];
     expect(normalizeName("  Müller-Lüdenscheidt ")).toBe("muller ludenscheidt");
-    expect(suggestPlayers("Beispiel Mia", players)).toEqual([{ id: "p3", name: "Mia Beispiel" }]);
-    expect(assignmentState({ provider: "x", externalPlayerId: "9", externalName: "Lena Muster" }, { players }).status).toBe("ambiguous");
-    expect(assignmentState({ provider: "x", externalPlayerId: "9", externalName: "Mia Beispiel" }, { players })).toMatchObject({ status: "suggested", player: null });
+    expect(nameCandidates("Beispiel Mia", people)).toEqual([{ name: "Mia Beispiel" }]);
+    expect(nameCandidates("Lena Muster", people)).toHaveLength(2);
+    expect(nameCandidates("", people)).toEqual([]);
   });
-  it("bestätigte Zuordnung über externe ID hat Vorrang", () => {
-    const links = [{ provider: "x", externalPlayerId: "9", player: "p2" }];
-    expect(assignmentState({ provider: "x", externalPlayerId: "9", externalName: "Irgendwer" }, { players, links })).toMatchObject({ status: "linked", player: "p2" });
+});
+
+describe("Vertrag", () => {
+  it("Provider meldet Schema-Version", () => {
+    expect(createBasketballBundProvider({ http: politeHttp({ baseUrl: "" }) }).schemaVersion).toBe(SCHEMA_VERSION);
   });
 });

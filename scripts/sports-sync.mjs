@@ -1,5 +1,5 @@
 // Spielbetrieb & Verbandsdaten – Sync und Zuordnungen (Serveradministration, Superuser-API).
-// Architektur: docs/SPORTS_DATA_ARCHITECTURE.md
+// TrainerHub-Verbraucher der Capability packages/sports-data. Architektur: docs/SPORTS_DATA_ARCHITECTURE.md
 //
 //   PB_URL=… PB_SUPERUSER_EMAIL=… PB_SUPERUSER_PASSWORD=… node scripts/sports-sync.mjs <befehl> [optionen]
 //
@@ -19,10 +19,15 @@
 // mit Pausen ab; Fehler landen in sync_runs, vorhandene Daten bleiben erhalten.
 
 import { adminApi } from "./pb-admin.mjs";
-import { createBasketballBundProvider, PROVIDER } from "../server/sports/providers/basketball-bund.js";
-import { pocketbaseStore, esc } from "../server/sports/store.js";
-import { syncSection, syncAll } from "../server/sports/sync.js";
-import { assignmentState } from "../server/sports/players.js";
+import { createBasketballBundProvider, politeHttp, basketballBund } from "../packages/sports-data/src/index.js";
+import { pocketbaseStore, esc } from "../server/trainerhub-sports/store.js";
+import { syncSection, syncAll } from "../server/trainerhub-sports/sync.js";
+import { assignmentState } from "../server/trainerhub-sports/players.js";
+
+const { PROVIDER, BASE_URL } = basketballBund;
+// TrainerHub nutzt die produktneutrale Capability mit eigenem, ehrlichem User-Agent
+const trainerhubProvider = () => createBasketballBundProvider({ http: politeHttp({ baseUrl: BASE_URL,
+  userAgent: "TrainerHub-Sync/1.0 (TV Bretten Basketball; Vereinsverwaltung, seltene Abrufe)" }) });
 
 function args(argv) {
   const out = { _: [] };
@@ -55,7 +60,7 @@ const sectionOf = (api, ref, org) => findOne(api, "sections", ref, org, "organiz
 const commands = {
   async discover(o) {
     if (!o.club) throw new Error("--club fehlt");
-    const provider = createBasketballBundProvider();
+    const provider = trainerhubProvider();
     const items = await provider.clubMatches(String(o.club), { rangeDays: Number(o.range ?? 21) });
     const teams = new Map();
     for (const { competition, game } of items) for (const side of [game.home, game.away]) {
@@ -110,7 +115,7 @@ const commands = {
   async run(o) {
     const api = await connect();
     const store = pocketbaseStore(api);
-    const provider = createBasketballBundProvider();
+    const provider = trainerhubProvider();
     const mode = o.mode ?? "full";
     if (!["full", "gameday"].includes(mode)) throw new Error("--mode full|gameday");
     const section = o.section ? (await sectionOf(api, o.section, o.org)).id : null;

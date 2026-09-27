@@ -5,7 +5,7 @@
 
 const ID_RE = /^[a-z0-9]{1,40}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const MISSING_THRESHOLD = 3;   // wie server/sports/sync.js
+const MISSING_THRESHOLD = 3;   // wie server/trainerhub-sports/sync.js
 
 function isoDay(offset) {
   const d = new Date();

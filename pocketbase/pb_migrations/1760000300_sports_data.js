@@ -1,7 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 // TrainerHub – Spielbetrieb & Verbandsdaten (siehe docs/SPORTS_DATA_ARCHITECTURE.md).
 //
-// Externe Verbandsdaten werden serverseitig vom Sync-Job (server/sports, Superuser) geschrieben.
+// Externe Verbandsdaten werden serverseitig vom Sync-Job (server/trainerhub-sports auf Basis von packages/sports-data, Superuser) geschrieben.
 // Für Benutzer:innen sind alle Provider-Daten nur lesbar – Ausnahme: die manuelle Bestätigung
 // einer Spieler-Zuordnung (player_links). Berechtigungsprofile und bestehende Collections bleiben
 // unverändert; die Regeln verwenden dieselben Bausteine wie 1760000200.

@@ -1,0 +1,11 @@
+{
+  "name": "@tvbretten/sports-data",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Produktneutrale Verbandsdaten-Capability (basketball-bund.net): Spielplan, Ergebnisse, Tabellen, Statistik als normalisierte Objekte",
+  "type": "module",
+  "exports": { ".": "./src/index.js" },
+  "bin": { "sports-data": "./bin/sports-data.mjs" },
+  "engines": { "node": ">=20" },
+  "dependencies": {}
+}
